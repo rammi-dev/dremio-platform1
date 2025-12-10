@@ -1,0 +1,22 @@
+# Keycloak Configuration
+# Used for documentation. Actual deployment via helm/keycloak/manifests/*.yaml
+
+auth:
+  adminUser: admin
+  adminPassword: password123
+
+externalDatabase:
+  host: postgres
+  port: 5432
+  database: keycloak
+  user: keycloak
+  password: password123
+  existingSecret: keycloak-db-secret
+  existingSecretPasswordKey: password
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+  hostname: keycloak.local

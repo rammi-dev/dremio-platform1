@@ -1,0 +1,22 @@
+# PostgreSQL Configuration
+# Used by helm/postgres/postgres-for-keycloak.yaml
+
+postgresql:
+  image:
+    repository: postgres
+    tag: "15"
+  
+  auth:
+    username: keycloak
+    password: password123
+    database: keycloak
+    
+  persistence:
+    enabled: true
+    size: 2Gi
+    accessModes:
+      - ReadWriteOnce
+
+service:
+  name: postgres
+  port: 5432

@@ -1,12 +1,39 @@
 # Keycloak & Vault on Minikube
 
-Complete setup for Keycloak (OIDC provider) and HashiCorp Vault with OIDC authentication on Minikube.
+Production-ready deployment of Keycloak and HashiCorp Vault on Minikube with OIDC integration and full data persistence.
+
+## Features
+
+- ✅ **Full Data Persistence**: PostgreSQL (2Gi) and Vault (1Gi) with persistent storage
+- ✅ **OIDC Integration**: Vault authenticates via Keycloak
+- ✅ **Multi-Environment Support**: Minikube profiles for dev/staging/prod
+- ✅ **Automated Deployment**: One-command setup
+- ✅ **Production-Ready**: StatefulSets with persistent volumes
+
+## Quick Start
+
+```bash
+# Deploy everything
+./scripts/deploy.sh
+
+# Access services
+# Keycloak: http://localhost:8080
+# Vault: http://localhost:8200
+```
 
 ## Architecture
 
-- **Keycloak Operator**: `operators` namespace
-- **Keycloak Instance**: `operators` namespace (with PostgreSQL)
-- **Vault**: `vault` namespace
+```
+┌─────────────────────────────────────────┐
+│         Minikube (keycloak-vault)       │
+│                                         │
+│  ┌──────────────┐    ┌──────────────┐  │
+│  │  Keycloak    │◄───┤    Vault     │  │
+│  │  + PostgreSQL│OIDC│              │  │
+│  │  (2Gi PV)    │    │  (1Gi PV)    │  │
+│  └──────────────┘    └──────────────┘  │
+└─────────────────────────────────────────┘
+```
 
 ## Prerequisites
 
@@ -16,220 +43,144 @@ Complete setup for Keycloak (OIDC provider) and HashiCorp Vault with OIDC authen
 - jq
 - curl
 
-## Quick Start
+**Windows Users**: See [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for required hosts file configuration.
 
-### 1. Start Minikube
+## Usage
 
-```bash
-minikube start --cpus 4 --memory 8192
-minikube addons enable ingress
-```
-
-### 2. Deploy Keycloak
+### Initial Deployment
 
 ```bash
-# Create namespaces
-kubectl create namespace operators
-kubectl create namespace keycloak
+# Default profile (keycloak-vault)
+./scripts/deploy.sh
 
-# Apply Keycloak CRDs
-kubectl apply -f k8s/keycloak-crd.yml
-kubectl apply -f k8s/keycloak-realm-crd.yml
-
-# Deploy Keycloak operator (in operators namespace)
-kubectl apply -f k8s/keycloak-operator.yml
-
-# Wait for operator
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keycloak-operator -n operators --timeout=120s
-
-# Deploy PostgreSQL and Keycloak
-kubectl apply -f k8s/postgres.yaml
-kubectl wait --for=condition=ready pod -l app=postgres -n operators --timeout=120s
-kubectl apply -f k8s/keycloak.yaml
-kubectl wait --for=condition=ready pod/keycloak-0 -n operators --timeout=180s
+# Custom profile
+MINIKUBE_PROFILE=my-env ./scripts/deploy.sh
 ```
 
-### 3. Access Keycloak UI
+### After Restart
 
 ```bash
-# Start port-forward (run in background or separate terminal)
-kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0 &
+# Restart everything (unseal Vault, start port-forwards)
+./scripts/restart.sh
 ```
 
-**Access**: http://localhost:8080
-
-**Initial Credentials**:
-```bash
-# Username
-kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d
-
-# Password
-kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d
-```
-
-**Important**: Create a permanent admin user immediately (see `KEYCLOAK_SETUP.md`)
-
-### 4. Deploy Vault
+### Multiple Environments
 
 ```bash
-# Create namespace
-kubectl create namespace vault
+# Create different profiles
+minikube start -p dev --cpus 2 --memory 4096
+minikube start -p staging --cpus 4 --memory 8192
 
-# Deploy Vault via Helm
-helm repo add hashicorp https://helm.releases.hashicorp.com
-helm repo update
-helm install vault hashicorp/vault -n vault -f vault-values.yaml
-
-# Wait for Vault pod
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vault -n vault --timeout=120s
-
-# Initialize and unseal Vault
-kubectl exec -n vault vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > vault-keys.json
-
-# Unseal Vault
-UNSEAL_KEY=$(cat vault-keys.json | jq -r '.unseal_keys_b64[0]')
-kubectl exec -n vault vault-0 -- vault operator unseal $UNSEAL_KEY
+# Switch between them
+./scripts/switch-env.sh dev
+./scripts/switch-env.sh staging
 ```
 
-**Save credentials**:
-```bash
-# Root token
-cat vault-keys.json | jq -r '.root_token'
+## Access
 
-# Keep vault-keys.json secure!
+### Keycloak
+- **URL**: http://localhost:8080
+- **Master Realm**: See `vault-keys.json` for credentials
+- **Vault Realm**: `admin` / `admin`
+
+### Vault
+- **URL**: http://localhost:8200
+- **Root Token**: See `vault-keys.json`
+- **OIDC Login**: Method=OIDC, Role=`admin`, then login with `admin`/`admin`
+
+## Documentation
+
+- **[CREDENTIALS.md](docs/CREDENTIALS.md)** - All access credentials and URLs
+- **[setup_guide.md](docs/setup_guide.md)** - Detailed step-by-step setup
+- **[RESTART_GUIDE.md](docs/RESTART_GUIDE.md)** - Restart procedure
+- **[MULTI_CLUSTER.md](docs/MULTI_CLUSTER.md)** - Managing multiple environments
+- **[OIDC_LOGIN_GUIDE.md](docs/OIDC_LOGIN_GUIDE.md)** - OIDC login troubleshooting
+- **[WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** - Windows-specific configuration
+- **[walkthrough.md](docs/walkthrough.md)** - Complete deployment walkthrough
+
+## Scripts
+
+- **[deploy.sh](scripts/deploy.sh)** - Complete automated deployment (all-in-one)
+- **[restart.sh](scripts/restart.sh)** - Restart after `minikube stop`
+- **[switch-env.sh](scripts/switch-env.sh)** - Switch between profiles
+
+## Data Persistence
+
+All data persists across Minikube restarts:
+
+- **PostgreSQL**: 2Gi persistent volume (Keycloak realms, users, clients)
+- **Vault**: 1Gi persistent volume (secrets, OIDC config, policies)
+
+After `minikube stop` and `minikube start`, just run `./scripts/restart.sh` to unseal Vault and restart port-forwards. No reconfiguration needed!
+
+## Project Structure
+
 ```
-
-### 5. Configure Keycloak for Vault
-
-Run the automated configuration script:
-
-```bash
-./configure-keycloak-for-vault.sh
+.
+├── helm/                   # Helm charts and Kubernetes manifests
+│   ├── vault/
+│   │   └── values.yaml     # Vault Helm values
+│   ├── keycloak/
+│   │   ├── values.yaml     # Keycloak Helm values
+│   │   └── manifests/      # Keycloak K8s manifests
+│   │       ├── keycloak-crd.yml
+│   │       ├── keycloak-realm-crd.yml
+│   │       ├── keycloak-operator.yml
+│   │       └── keycloak-instance.yaml
+│   └── postgres/
+│       ├── values.yaml                 # PostgreSQL configuration
+│       └── postgres-for-keycloak.yaml  # PostgreSQL for Keycloak
+├── scripts/                # Deployment and management scripts
+│   ├── deploy.sh           # Main deployment script
+│   ├── restart.sh          # Restart script
+│   └── switch-env.sh       # Profile switcher
+├── docs/                   # Documentation
+│   ├── CREDENTIALS.md      # Access credentials
+│   ├── setup_guide.md      # Detailed setup guide
+│   ├── RESTART_GUIDE.md    # Restart instructions
+│   └── *.md                # Other guides
+├── config/                 # Generated configuration (gitignored)
+│   ├── vault-keys.json     # Vault credentials
+│   └── keycloak-vault-client-secret.txt
+└── README.md               # This file
 ```
-
-This creates:
-- Vault realm in Keycloak
-- OIDC client with client secret
-- vault-admins group
-- Admin user in vault realm
-
-**Client secret** will be saved to `keycloak-vault-client-secret.txt`
-
-### 6. Configure Vault OIDC
-
-```bash
-# Copy policy file to Vault pod
-cat > /tmp/admin-policy.hcl <<'EOF'
-path "*" {
-  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-}
-EOF
-kubectl cp /tmp/admin-policy.hcl vault/vault-0:/tmp/admin-policy.hcl
-
-# Configure Vault
-ROOT_TOKEN=$(cat vault-keys.json | jq -r '.root_token')
-CLIENT_SECRET=$(cat keycloak-vault-client-secret.txt)
-
-kubectl exec -n vault vault-0 -- vault login $ROOT_TOKEN
-kubectl exec -n vault vault-0 -- vault write auth/oidc/config \
-    oidc_discovery_url="http://keycloak-service.operators.svc.cluster.local:8080/realms/vault" \
-    oidc_client_id="vault" \
-    oidc_client_secret="$CLIENT_SECRET" \
-    default_role="admin"
-
-kubectl exec -n vault vault-0 -- vault policy write admin /tmp/admin-policy.hcl
-
-kubectl exec -n vault vault-0 -- vault write auth/oidc/role/admin \
-    bound_audiences="vault" \
-    allowed_redirect_uris="http://localhost:8200/ui/vault/auth/oidc/oidc/callback" \
-    allowed_redirect_uris="http://127.0.0.1:8200/ui/vault/auth/oidc/oidc/callback" \
-    allowed_redirect_uris="http://localhost:8250/oidc/callback" \
-    user_claim="sub" \
-    groups_claim="groups" \
-    policies="admin" \
-    ttl="1h"
-
-# Create group mapping
-OIDC_ACCESSOR=$(kubectl exec -n vault vault-0 -- vault auth list -format=json | jq -r '.["oidc/"].accessor')
-kubectl exec -n vault vault-0 -- vault write identity/group name="vault-admins" type="external" policies="admin"
-GROUP_ID=$(kubectl exec -n vault vault-0 -- vault read -field=id identity/group/name/vault-admins)
-kubectl exec -n vault vault-0 -- vault write identity/group-alias \
-    name="vault-admins" \
-    mount_accessor="$OIDC_ACCESSOR" \
-    canonical_id="$GROUP_ID"
-```
-
-### 7. Access Vault UI (Windows)
-
-#### A. Start Port-Forward
-
-```bash
-kubectl port-forward -n vault svc/vault-ui 8200:8200 --address=0.0.0.0 &
-```
-
-#### B. Configure Windows Hosts File
-
-**Required for OIDC to work from Windows browser**
-
-1. Open Notepad as Administrator
-2. Open: `C:\Windows\System32\drivers\etc\hosts`
-3. Add line: `127.0.0.1 keycloak-service.operators.svc.cluster.local`
-4. Save and close
-
-#### C. Login to Vault
-
-1. Open browser: http://localhost:8200 or http://127.0.0.1:8200
-2. Select Method: **OIDC**
-3. Click "Sign in with OIDC Provider"
-4. Login with Keycloak credentials (username: admin, password: admin)
-5. You'll be redirected back to Vault with full admin access!
-
-## Port-Forward Commands
-
-**Keycloak**:
-```bash
-kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0
-```
-
-**Vault**:
-```bash
-kubectl port-forward -n vault svc/vault-ui 8200:8200 --address=0.0.0.0
-```
-
-## Important Files
-
-- `vault-keys.json` - Vault root token and unseal key (keep secure!)
-- `keycloak-vault-client-secret.txt` - Keycloak OIDC client secret
-- `KEYCLOAK_SETUP.md` - Detailed Keycloak configuration guide
-- `VAULT_TEST.md` - Vault testing and verification guide
-- `FIX_VAULT_DNS.md` - Windows hosts file configuration
 
 ## Troubleshooting
 
-### Keycloak pod not starting
-```bash
-kubectl logs keycloak-0 -n operators
-kubectl describe keycloak keycloak -n operators
-```
+### Vault OIDC Login Fails
+- Ensure role is set to `admin`
+- Windows: Check hosts file (see [WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md))
+- Verify port-forwards are running
 
-### Vault sealed after restart
-```bash
-UNSEAL_KEY=$(cat vault-keys.json | jq -r '.unseal_keys_b64[0]')
-kubectl exec -n vault vault-0 -- vault operator unseal $UNSEAL_KEY
-```
+### After Restart
+- Vault will be sealed - run `./scripts/restart.sh`
+- Port-forwards need to be restarted
+- All data persists automatically
 
-### OIDC login fails
-- Verify both port-forwards are running
-- Check Windows hosts file has the entry
-- Verify Keycloak client redirect URIs include both localhost and 127.0.0.1
+### Multiple Clusters
+- Use different profiles: `minikube start -p <name>`
+- Switch with: `./scripts/switch-env.sh <name>`
+- See [MULTI_CLUSTER.md](docs/MULTI_CLUSTER.md) for details
 
 ## Clean Up
 
 ```bash
-helm uninstall vault -n vault
-kubectl delete namespace vault
-kubectl delete keycloak keycloak -n operators
-kubectl delete -f k8s/postgres.yaml
-kubectl delete -f k8s/keycloak-operator.yml
-kubectl delete namespace operators keycloak
+# Delete specific profile
+minikube delete -p keycloak-vault
+
+# Delete all
+minikube delete --all
 ```
+
+## Important Files
+
+Generated during deployment (stored in `config/`):
+- `config/vault-keys.json` - Vault root token and unseal key
+- `config/keycloak-vault-client-secret.txt` - OIDC client secret
+
+> [!NOTE]
+> Since this is a test project, credentials in `config/` can be committed to git for convenience. For production, **never** commit secrets!
+
+## License
+
+This is a reference implementation for development and testing purposes.
