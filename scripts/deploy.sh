@@ -107,11 +107,19 @@ echo "✓ Vault pod running"
 echo ""
 echo "Step 7: Initializing Vault..."
 sleep 5
-if [ -f config/vault-keys.json ]; then
-  echo "Vault keys found in config/vault-keys.json, skipping initialization."
-else
+# Check actual Vault status
+VAULT_INIT_STATUS=$(kubectl exec -n vault vault-0 -- vault status -format=json 2>/dev/null | jq -r .initialized)
+
+if [ "$VAULT_INIT_STATUS" == "false" ]; then
+  echo "Vault is not initialized. Initializing now..."
   kubectl exec -n vault vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > config/vault-keys.json
   echo "✓ Vault initialized"
+else
+  echo "Vault is already initialized."
+  if [ ! -f config/vault-keys.json ]; then
+    echo "WARNING: Vault is initialized but config/vault-keys.json is missing!"
+    echo "         You will need the original keys to unseal."
+  fi
 fi
 
 # Step 8: Unseal Vault
