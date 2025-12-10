@@ -1,0 +1,28 @@
+server:
+  standalone:
+    enabled: true
+  
+  service:
+    enabled: true
+    type: ClusterIP
+  
+  dataStorage:
+    enabled: true
+    size: 1Gi
+    storageClass: null
+  
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+ui:
+  enabled: true
+  serviceType: ClusterIP
+  externalPort: 8200
+
+injector:
+  enabled: false
