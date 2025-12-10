@@ -7,7 +7,6 @@ echo "Starting Minikube (profile: $PROFILE)..."
 minikube start -p $PROFILE
 
 echo "Waiting for pods to be ready..."
-echo "Waiting for pods to be ready..."
 kubectl wait --for=condition=ready pod -l app=postgres -n operators --timeout=120s
 
 # Wait for Keycloak pod to exist first
