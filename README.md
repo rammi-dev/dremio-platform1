@@ -157,6 +157,15 @@ After `minikube stop` and `minikube start`, just run `./scripts/restart.sh` to u
 - Port-forwards need to be restarted
 - All data persists automatically
 
+### Feature: MinIO Object Storage (Add-on)
+This project includes an optional MinIO integration with OIDC authentication (via Keycloak).
+
+See **[helm/minio/README.md](helm/minio/README.md)** for deployment, access, and troubleshooting instructions.
+
+**Quick Command:**
+```bash
+./scripts/deploy-minio.sh
+```
 ### Multiple Clusters
 - Use different profiles: `minikube start -p <name>`
 - Switch with: `./scripts/switch-env.sh <name>`
