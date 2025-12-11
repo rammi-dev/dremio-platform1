@@ -1,6 +1,6 @@
 #!/bin/bash
-# Complete deployment script for Keycloak and Vault on Minikube
-# Uses profile-based deployment with full validation
+# Complete deployment script for Keycloak and Vault on GKE
+# Uses existing GKE cluster with full validation
 
 set -e
 
@@ -9,20 +9,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-PROFILE="${MINIKUBE_PROFILE:-keycloak-vault}"
-
 echo "========================================="
-echo "Keycloak & Vault Deployment"
-echo "Profile: $PROFILE"
+echo "Keycloak & Vault Deployment (GKE)"
 echo "========================================="
 echo ""
 
-# Step 1: Start Minikube
-echo "Step 1: Starting Minikube..."
-minikube start -p $PROFILE --cpus 4 --memory 8192
-minikube addons enable ingress -p $PROFILE
-minikube profile $PROFILE
-echo "✓ Minikube started"
+# Step 1: Verify GKE Cluster
+echo "Step 1: Verifying GKE cluster connection..."
+if ! kubectl cluster-info &> /dev/null; then
+  echo "ERROR: Cannot connect to Kubernetes cluster. Please verify kubectl is configured for GKE."
+  exit 1
+fi
+echo "✓ GKE cluster connected"
+kubectl cluster-info | head -n 1
 echo ""
 
 # Step 2: Create Namespaces
@@ -33,14 +32,14 @@ kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
 echo "✓ Namespaces ready"
 echo ""
 
-# Step 3: Deploy Keycloak
-echo "Step 3: Deploying Keycloak..."
+# Step 3: Deploy Keycloak Operator
+echo "Step 3: Deploying Keycloak CRDs and Operator..."
 kubectl apply -f helm/keycloak/manifests/keycloak-crd.yml
 kubectl apply -f helm/keycloak/manifests/keycloak-realm-crd.yml
 kubectl apply -f helm/keycloak/manifests/keycloak-operator.yml
 
-echo "Waiting for Keycloak operator..."
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keycloak-operator -n operators --timeout=120s
+echo "Waiting for Keycloak operator deployment..."
+kubectl wait --for=condition=available deployment/keycloak-operator -n operators --timeout=120s
 echo "✓ Keycloak operator ready"
 
 # Step 4: Deploy PostgreSQL
@@ -49,7 +48,7 @@ echo "Step 4: Deploying PostgreSQL with persistent storage..."
 kubectl apply -f helm/postgres/postgres-for-keycloak.yaml
 
 echo "Waiting for PostgreSQL..."
-kubectl wait --for=condition=ready pod -l app=postgres -n operators --timeout=120s
+kubectl rollout status statefulset/postgres -n operators --timeout=120s
 echo "✓ PostgreSQL ready (2Gi persistent storage)"
 
 # Step 5: Deploy Keycloak Instance
@@ -195,39 +194,67 @@ CLIENT_SECRET=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients
 echo "$CLIENT_SECRET" > config/keycloak-vault-client-secret.txt
 
 # Create vault-admins group
-curl -s -X POST "http://localhost:8080/admin/realms/vault/groups" \
+# Create vault-admins group
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080/admin/realms/vault/groups" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "vault-admins"}' > /dev/null
+  -d '{"name": "vault-admins"}')
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  echo "ERROR: Failed to create vault-admins group in Keycloak (HTTP $HTTP_CODE)"
+  exit 1
+fi
 
 GROUP_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/groups?search=vault-admins" \
   -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
+if [[ -z "$GROUP_ID" || "$GROUP_ID" == "null" ]]; then
+  echo "ERROR: Failed to retrieve vault-admins group ID from Keycloak"
+  exit 1
+fi
 
 # Create admin user
-curl -s -X POST "http://localhost:8080/admin/realms/vault/users" \
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080/admin/realms/vault/users" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "email": "admin@vault.local", "enabled": true, "emailVerified": true}' > /dev/null
+  -d '{"username": "admin", "email": "admin@vault.local", "enabled": true, "emailVerified": true}')
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  echo "ERROR: Failed to create admin user in Keycloak (HTTP $HTTP_CODE)"
+  exit 1
+fi
 
 USER_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/users?username=admin" \
   -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
+if [[ -z "$USER_ID" || "$USER_ID" == "null" ]]; then
+  echo "ERROR: Failed to retrieve admin user ID from Keycloak"
+  exit 1
+fi
 
 # Set password
-curl -s -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/reset-password" \
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/reset-password" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"type": "password", "value": "admin", "temporary": false}' > /dev/null
+  -d '{"type": "password", "value": "admin", "temporary": false}')
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  echo "ERROR: Failed to set password for admin user in Keycloak (HTTP $HTTP_CODE)"
+  exit 1
+fi
 
 # Add user to group
-curl -s -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/groups/$GROUP_ID" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" > /dev/null
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/groups/$GROUP_ID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN")
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  echo "ERROR: Failed to add admin user to vault-admins group in Keycloak (HTTP $HTTP_CODE)"
+  exit 1
+fi
 
 # Add group mapper
-curl -s -X POST "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/protocol-mappers/models" \
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/protocol-mappers/models" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "config": {"full.path": "false", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "groups", "userinfo.token.claim": "true"}}' > /dev/null
-
+  -d '{"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "config": {"full.path": "false", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "groups", "userinfo.token.claim": "true"}}')
+if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+  echo "ERROR: Failed to add group mapper to Keycloak client (HTTP $HTTP_CODE)"
+  exit 1
+fi
 echo "✓ Keycloak vault realm configured"
 echo "  - Realm: vault"
 echo "  - OIDC Client: vault"
@@ -270,7 +297,7 @@ kubectl exec -n vault vault-0 -- vault write auth/oidc/role/admin \
     ttl="1h" > /dev/null
 
 # Create group mapping
-OIDC_ACCESSOR=$(kubectl exec -n vault vault-0 -- vault auth list -format=json | jq -r '."oidc/".accessor')
+OIDC_ACCESSOR=$(kubectl exec -n vault vault-0 -- vault auth list -format=json | jq -r '.["oidc/"].accessor')
 kubectl exec -n vault vault-0 -- vault write identity/group name="vault-admins" type="external" policies="admin" > /dev/null
 GROUP_ID=$(kubectl exec -n vault vault-0 -- vault read -field=id identity/group/name/vault-admins)
 kubectl exec -n vault vault-0 -- vault write identity/group-alias \
@@ -293,7 +320,7 @@ echo "========================================="
 echo "Deployment Complete!"
 echo "========================================="
 echo ""
-echo "Minikube Profile: $PROFILE"
+echo "GKE Cluster: $(kubectl config current-context)"
 echo ""
 echo "Keycloak UI: http://localhost:8080"
 echo "  Master Realm:"
@@ -315,9 +342,6 @@ echo "Persistent Storage:"
 echo "  - PostgreSQL: 2Gi (Keycloak data persists)"
 echo "  - Vault: 1Gi (Vault secrets persist)"
 echo ""
-echo "To restart after 'minikube stop':"
-echo "  ./restart.sh"
-echo ""
-echo "To switch to this profile:"
-echo "  minikube profile $PROFILE"
+echo "Port-forwards are running in the background."
+echo "To stop them: pkill -f 'kubectl port-forward'"
 echo ""

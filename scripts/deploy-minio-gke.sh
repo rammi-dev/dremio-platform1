@@ -10,12 +10,12 @@ cd "$PROJECT_ROOT"
 source "$SCRIPT_DIR/lib/minio-common.sh"
 
 echo "========================================="
-echo "MinIO Deployment (Add-on)"
+echo "MinIO Deployment (Add-on) - GKE"
 echo "========================================="
 echo ""
 
 # Check if Keycloak is running
-check_keycloak_status "./scripts/deploy.sh"
+check_keycloak_status "./scripts/deploy-gke.sh"
 
 # Authenticate with Keycloak and get access token
 authenticate_keycloak
