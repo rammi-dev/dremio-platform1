@@ -95,7 +95,9 @@ if helm status vault -n vault > /dev/null 2>&1; then
   echo "       To delete: helm uninstall vault -n vault"
   exit 1
 else
-  helm install vault hashicorp/vault -n vault -f helm/vault/values.yaml
+  # Pin to specific chart version to reduce supply-chain attack surface
+  # Vault is a highly privileged component with access to all cluster secrets
+  helm install vault hashicorp/vault --version 0.28.0 -n vault -f helm/vault/values.yaml
 fi
 
 echo "Waiting for Vault pod to start..."
