@@ -180,7 +180,10 @@ configure_minio_oidc() {
   # ROBUST OIDC PATCH: Explicitly inject OIDC config into Secret and Restart Pod
   # This ensures OIDC is active regardless of Operator sync issues
   echo "Ensuring OIDC Configuration Persistence..."
-  CURRENT_ENV=$(kubectl get secret "$MINIO_SECRET_NAME" -n minio -o jsonpath='{.data.config\.env}' | base64 -d)
+  if ! CURRENT_ENV=$(kubectl get secret "$MINIO_SECRET_NAME" -n minio -o jsonpath='{.data.config\.env}' | base64 -d); then
+    echo "ERROR: Failed to retrieve MinIO secret configuration"
+    exit 1
+  fi
   
   # Construct OIDC block
   OIDC_ENV="
@@ -254,7 +257,10 @@ store_credentials_in_vault() {
   if [ -f config/vault-keys.json ]; then
       ROOT_TOKEN=$(jq -r '.root_token' config/vault-keys.json)
       
-      kubectl exec -n vault vault-0 -- vault login "$ROOT_TOKEN" > /dev/null
+      if ! kubectl exec -n vault vault-0 -- vault login "$ROOT_TOKEN" > /dev/null; then
+        echo "ERROR: Failed to login to Vault"
+        return 1
+      fi
       
       # Enable secret engine if not exists
       echo "Enabling 'secret' KV engine..."
@@ -304,7 +310,7 @@ create_minio_policy() {
   if kubectl run minio-policy-setup --image=quay.io/minio/mc:latest --restart=Never --rm -i --command -- \
     /bin/sh -c "
     echo 'Connecting to MinIO...';
-    mc alias set myminio https://minio.minio.svc.cluster.local:443 $minio_user $minio_password --insecure;
+    mc alias set myminio https://minio.minio.svc.cluster.local:443 '$minio_user' '$minio_password' --insecure;
     echo '$POLICY_JSON' > /tmp/policy.json;
     mc admin policy create myminio minio-access /tmp/policy.json --insecure;
     echo 'Policy minio-access created';
@@ -319,7 +325,8 @@ create_minio_policy() {
 start_port_forward() {
   echo "Starting MinIO Console Port-Forward..."
   pkill -f "kubectl port-forward -n minio svc/minio-console" || true
-  nohup kubectl port-forward -n minio svc/minio-console 9091:9443 --address=0.0.0.0 > /dev/null 2>&1 &
+  # Use 127.0.0.1 for localhost-only access for security
+  nohup kubectl port-forward -n minio svc/minio-console 9091:9443 --address=127.0.0.1 > /dev/null 2>&1 &
   echo "✓ Port-forward started"
 }
 
