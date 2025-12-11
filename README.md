@@ -79,17 +79,32 @@ minikube start -p staging --cpus 4 --memory 8192
 ## Access
 
 ### Keycloak
+
+> **Important**: Keycloak has **two separate realms** with different credentials:
+
+**Master Realm** (Keycloak Admin Console):
 - **URL**: http://localhost:8080
-- **Master Realm**: See `vault-keys.json` for credentials
-- **Vault Realm**: `admin` / `admin`
+- **Username**: `temp-admin`
+- **Password**: *Dynamically generated* - retrieve with:
+  ```bash
+  kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d
+  ```
+
+**Vault Realm** (Application Users):
+- **URL**: http://localhost:8080/realms/vault
+- **Username**: `admin`
+- **Password**: `admin`
+- **Purpose**: Login to Vault and MinIO via OIDC
+- **Note**: This user does NOT work for the master realm admin console
 
 ### Vault
 - **URL**: http://localhost:8200
-- **Root Token**: See `vault-keys.json`
+- **Root Token**: See `config/vault-keys.json`
 - **OIDC Login**: Method=OIDC, Role=`admin`, then login with `admin`/`admin`
 
 ## Documentation
 
+- **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick access to all credentials and commands
 - **[CREDENTIALS.md](docs/CREDENTIALS.md)** - All access credentials and URLs
 - **[setup_guide.md](docs/setup_guide.md)** - Detailed step-by-step setup
 - **[RESTART_GUIDE.md](docs/RESTART_GUIDE.md)** - Restart procedure
