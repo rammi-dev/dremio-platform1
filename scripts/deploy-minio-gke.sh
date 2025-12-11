@@ -121,7 +121,12 @@ helm repo update minio-operator
 
 kubectl create namespace minio-operator --dry-run=client -o yaml | kubectl apply -f -
 echo "Installing/Upgrading MinIO Operator..."
-helm upgrade --install minio-operator minio-operator/operator -n minio-operator -f helm/minio/operator-values.yaml --wait
+# Pin to specific version to prevent supply-chain attacks
+helm upgrade --install minio-operator minio-operator/operator \
+  --version 6.0.4 \
+  -n minio-operator \
+  -f helm/minio/operator-values.yaml \
+  --wait
 
 echo "✓ MinIO Operator ready"
 
@@ -130,7 +135,11 @@ echo "Deploying MinIO Tenant..."
 kubectl create namespace minio --dry-run=client -o yaml | kubectl apply -f -
 
 # Pass OIDC secret via --set
-helm upgrade --install minio minio-operator/tenant -n minio -f helm/minio/tenant-values.yaml \
+# Pin to specific version to prevent supply-chain attacks
+helm upgrade --install minio minio-operator/tenant \
+  --version 6.0.4 \
+  -n minio \
+  -f helm/minio/tenant-values.yaml \
   --set tenant.configuration.envs[2].name=MINIO_IDENTITY_OPENID_CLIENT_ID \
   --set tenant.configuration.envs[2].value=minio \
   --set tenant.configuration.envs[3].name=MINIO_IDENTITY_OPENID_CLIENT_SECRET \
