@@ -1,0 +1,57 @@
+# MinIO Tenant Values
+tenant:
+  name: minio
+  image:
+    repository: quay.io/minio/minio
+    tag: RELEASE.2024-11-07T00-52-20Z
+    pullPolicy: IfNotPresent
+  requestAutoCert: false
+  pools:
+    - name: pool-0
+      servers: 1
+      volumesPerServer: 2
+      size: 2Gi
+      storageClassName: standard
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+  
+  buckets:
+    - name: default-bucket
+      region: us-east-1
+
+  
+  configSecret:
+    name: minio-env-configuration
+
+  # Configuration for OIDC will be injected via environment variables
+  configuration:
+    envs:
+      - name: MINIO_BROWSER_REDIRECT_URL
+        value: "http://localhost:9091"
+      - name: MINIO_IDENTITY_OPENID_CONFIG_URL
+        value: "http://keycloak-service.operators.svc.cluster.local:8080/realms/vault/.well-known/openid-configuration"
+      - name: MINIO_IDENTITY_OPENID_CLIENT_ID
+        value: "minio"
+      - name: MINIO_IDENTITY_OPENID_CLAIM_NAME
+        value: "groups"
+      - name: MINIO_IDENTITY_OPENID_SCOPES
+        value: "openid,profile,email"
+      - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME
+        value: "Keycloak"
+      # MINIO_IDENTITY_OPENID_CLIENT_SECRET will be injected by deploy-minio.sh
+        
+  service:
+    type: ClusterIP
+
+  # Enable Console
+  console:
+    image:
+      repository: quay.io/minio/console
+      tag: v1.7.2
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
