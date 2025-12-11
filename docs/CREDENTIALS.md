@@ -18,27 +18,41 @@ Your Keycloak and Vault environment is now fully configured and running.
 
 ## 🔑 Credentials
 
+> **Important**: Keycloak has **two separate realms** with different credentials:
+
 ### Keycloak Master Realm (for admin access)
 - **Realm**: `master`
+- **URL**: http://localhost:8080
 - **Username**: `temp-admin`
-- **Password**: `02a52cab1b2f4e5991456ae46bf429f2`
-- **Use for**: Keycloak administration
+- **Password**: *Dynamically generated during deployment*
+- **Retrieve password**:
+  ```bash
+  kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d
+  ```
+- **Use for**: Keycloak administration (managing realms, clients, users)
 
 ### Keycloak Vault Realm (for Vault OIDC login)
 - **Realm**: `vault`
+- **URL**: http://localhost:8080/realms/vault
 - **Username**: `admin`
 - **Password**: `admin`
-- **Use for**: Logging into Vault via OIDC
+- **Use for**: Logging into Vault and MinIO via OIDC
+- **Note**: This user does NOT work for the master realm admin console
 
 ### Vault
-- **Root Token**: `hvs.wu8t4HgeMcdhwvzrIc4M7si3`
-- **Unseal Key**: `Z1ATqiy2Dnmze1DESudG2Ux5D0Yyw0HLJNgYIF1zabc=`
-- **OIDC Client Secret**: `5nhJV4q0LU3yv9mQF7UgjaEJUjSUakWf`
+- **Root Token**: Stored in `config/vault-keys.json`
+- **Retrieve token**:
+  ```bash
+  cat config/vault-keys.json | jq -r '.root_token'
+  ```
+- **Unseal Key**: Also in `config/vault-keys.json`
+- **OIDC Client Secret**: Stored in `config/keycloak-vault-client-secret.txt`
 
 > [!IMPORTANT]
 > These credentials are stored in:
-> - `vault-keys.json` - Vault root token and unseal key
-> - `keycloak-vault-client-secret.txt` - OIDC client secret
+> - `config/vault-keys.json` - Vault root token and unseal key
+> - `config/keycloak-vault-client-secret.txt` - OIDC client secret
+> - Keycloak master realm password: Kubernetes secret `keycloak-initial-admin`
 
 ---
 
@@ -60,7 +74,12 @@ kubectl port-forward -n vault svc/vault-ui 8200:8200 --address=0.0.0.0 &
 2. Click "Administration Console"
 3. Login with:
    - Username: `temp-admin`
-   - Password: `02a52cab1b2f4e5991456ae46bf429f2`
+   - Password: *(retrieve with command above)*
+   
+   ```bash
+   # Get the current password
+   kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d
+   ```
 
 ### 3. Access Vault via OIDC
 
@@ -80,7 +99,10 @@ kubectl port-forward -n vault svc/vault-ui 8200:8200 --address=0.0.0.0 &
 
 1. Open browser: http://localhost:8200
 2. Select Method: **Token**
-3. Enter token: `hvs.wu8t4HgeMcdhwvzrIc4M7si3`
+3. Enter token: *(retrieve with command below)*
+   ```bash
+   cat config/vault-keys.json | jq -r '.root_token'
+   ```
 
 ---
 
