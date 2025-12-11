@@ -1,7 +1,9 @@
-# MinIO Operator Values
 operator:
   replicaCount: 1
-  replicaCount: 1
+  image:
+    repository: quay.io/minio/operator
+    tag: v6.0.4
+    pullPolicy: IfNotPresent
   resources:
     requests:
       cpu: 100m

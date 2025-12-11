@@ -32,10 +32,14 @@ kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
 echo "✓ Namespaces ready"
 echo ""
 
+# Step 3: Deploy Keycloak Operator
+echo "Step 3: Deploying Keycloak CRDs and Operator..."
+kubectl apply -f helm/keycloak/manifests/keycloak-crd.yml
+kubectl apply -f helm/keycloak/manifests/keycloak-realm-crd.yml
 kubectl apply -f helm/keycloak/manifests/keycloak-operator.yml
 
-echo "Waiting for Keycloak operator..."
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keycloak-operator -n operators --timeout=120s
+echo "Waiting for Keycloak operator deployment..."
+kubectl wait --for=condition=available deployment/keycloak-operator -n operators --timeout=120s
 echo "✓ Keycloak operator ready"
 
 # Step 4: Deploy PostgreSQL
@@ -44,7 +48,7 @@ echo "Step 4: Deploying PostgreSQL with persistent storage..."
 kubectl apply -f helm/postgres/postgres-for-keycloak.yaml
 
 echo "Waiting for PostgreSQL..."
-kubectl wait --for=condition=ready pod -l app=postgres -n operators --timeout=120s
+kubectl rollout status statefulset/postgres -n operators --timeout=120s
 echo "✓ PostgreSQL ready (2Gi persistent storage)"
 
 # Step 5: Deploy Keycloak Instance
@@ -293,7 +297,7 @@ kubectl exec -n vault vault-0 -- vault write auth/oidc/role/admin \
     ttl="1h" > /dev/null
 
 # Create group mapping
-OIDC_ACCESSOR=$(kubectl exec -n vault vault-0 -- vault auth list -format=json | jq -r '.\"oidc/\".accessor')
+OIDC_ACCESSOR=$(kubectl exec -n vault vault-0 -- vault auth list -format=json | jq -r '.["oidc/"].accessor')
 kubectl exec -n vault vault-0 -- vault write identity/group name="vault-admins" type="external" policies="admin" > /dev/null
 GROUP_ID=$(kubectl exec -n vault vault-0 -- vault read -field=id identity/group/name/vault-admins)
 kubectl exec -n vault vault-0 -- vault write identity/group-alias \

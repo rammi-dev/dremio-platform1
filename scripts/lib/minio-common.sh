@@ -325,9 +325,16 @@ create_minio_policy() {
 start_port_forward() {
   echo "Starting MinIO Console Port-Forward..."
   pkill -f "kubectl port-forward -n minio svc/minio-console" || true
-  # Use 127.0.0.1 for localhost-only access for security
-  nohup kubectl port-forward -n minio svc/minio-console 9091:9443 --address=127.0.0.1 > /dev/null 2>&1 &
-  echo "✓ Port-forward started"
+  # Use 0.0.0.0 to allow access from local machine when running on VM/cloud shell
+  # Use nohup to keep it running
+  nohup kubectl port-forward -n minio svc/minio-console 9091:9443 --address=0.0.0.0 > /dev/null 2>&1 &
+  sleep 3
+  if ps aux | grep -q "[k]ubectl port-forward -n minio"; then
+      echo "✓ Port-forward started"
+  else
+      echo "WARNING: Port-forward failed to start or exited immediately."
+      echo "Try running manually: kubectl port-forward -n minio svc/minio-console 9091:9443 --address=0.0.0.0"
+  fi
 }
 
 # Print completion message

@@ -1,0 +1,14 @@
+# Configuration and Credentials
+config/
+*.json
+*.txt
+
+# IDEs
+.idea/
+.vscode/
+
+# System
+.DS_Store
+
+# Helm
+*.lock

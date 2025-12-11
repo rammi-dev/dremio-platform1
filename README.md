@@ -104,6 +104,7 @@ minikube start -p staging --cpus 4 --memory 8192
 
 ## Documentation
 
+- **[GKE_DEPLOYMENT_GUIDE.md](docs/GKE_DEPLOYMENT_GUIDE.md)** - Complete GKE deployment and testing guide
 - **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick access to all credentials and commands
 - **[CREDENTIALS.md](docs/CREDENTIALS.md)** - All access credentials and URLs
 - **[setup_guide.md](docs/setup_guide.md)** - Detailed step-by-step setup
@@ -112,6 +113,7 @@ minikube start -p staging --cpus 4 --memory 8192
 - **[OIDC_LOGIN_GUIDE.md](docs/OIDC_LOGIN_GUIDE.md)** - OIDC login troubleshooting
 - **[WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** - Windows-specific configuration
 - **[walkthrough.md](docs/walkthrough.md)** - Complete deployment walkthrough
+
 
 ## Scripts
 
