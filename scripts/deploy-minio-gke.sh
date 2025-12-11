@@ -40,33 +40,29 @@ fi
 
 # Configure Keycloak Client for MinIO
 echo "Configuring Keycloak 'minio' client..."
-# Check if client exists
-CLIENT_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
+# Check if client exists and get UUID
+CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
   -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
 
-if [ "$CLIENT_ID" == "null" ]; then
+if [ "$CLIENT_UUID" == "null" ]; then
   # Create client
   curl -s -X POST "http://localhost:8080/admin/realms/vault/clients" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"clientId": "minio", "name": "MinIO Console", "enabled": true, "protocol": "openid-connect", "publicClient": false, "directAccessGrantsEnabled": true, "standardFlowEnabled": true, "redirectUris": ["https://localhost:9091/*", "http://localhost:9091/*"], "webOrigins": ["+"]}' > /dev/null
   echo "✓ Created 'minio' client"
-else
-  echo "✓ 'minio' client already exists - Updating Redirect URIs..."
-  # Update existing client (in case port changed)
+  # Get the newly created client UUID
   CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
     -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
-    
+else
+  echo "✓ 'minio' client already exists - Updating Redirect URIs..."
+  # Update existing client (in case port changed), reusing CLIENT_UUID from initial check
   curl -s -X PUT "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"clientId": "minio", "name": "MinIO Console", "enabled": true, "protocol": "openid-connect", "publicClient": false, "directAccessGrantsEnabled": true, "standardFlowEnabled": true, "redirectUris": ["https://localhost:9091/*", "http://localhost:9091/*"], "webOrigins": ["+"]}' > /dev/null
   echo "✓ Updated 'minio' client configuration"
 fi
-
-# Get Client UUID
-CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
 
 # Get Client Secret
 CLIENT_SECRET=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/client-secret" \
