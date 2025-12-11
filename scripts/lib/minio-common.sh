@@ -25,6 +25,8 @@ authenticate_keycloak() {
     -d "grant_type=password" \
     -d "client_id=admin-cli")
   
+  # Export so it's available to calling scripts
+  export ACCESS_TOKEN
   ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r ".access_token")
   
   if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
@@ -63,6 +65,8 @@ configure_keycloak_client() {
   fi
   
   # Get Client UUID
+  # Export so it's available to calling scripts
+  export CLIENT_UUID
   CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
     -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
   
@@ -164,6 +168,8 @@ configure_minio_oidc() {
   # Extract MinIO Credentials
   # The secret name is typically <tenant-name>-configuration or similar depending on chart version.
   # We will look for the secret that contains MINIO_ROOT_USER
+  # Export so it's available to other functions
+  export MINIO_SECRET_NAME
   MINIO_SECRET_NAME=$(kubectl get secret -n minio -o jsonpath='{.items[?(@.data.config\.env)].metadata.name}' | awk '{print $1}')
   
   if [ -z "$MINIO_SECRET_NAME" ]; then
