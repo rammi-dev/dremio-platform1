@@ -20,8 +20,8 @@ authenticate_keycloak() {
   
   TOKEN_RESPONSE=$(curl -s -X POST "http://localhost:8080/realms/master/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "username=$KEYCLOAK_USER" \
-    -d "password=$KEYCLOAK_PASS" \
+    -d "username=${KEYCLOAK_USER}" \
+    -d "password=${KEYCLOAK_PASS}" \
     -d "grant_type=password" \
     -d "client_id=admin-cli")
   
@@ -181,7 +181,7 @@ configure_minio_oidc() {
   # This ensures OIDC is active regardless of Operator sync issues
   echo "Ensuring OIDC Configuration Persistence..."
   if ! CURRENT_ENV=$(kubectl get secret "$MINIO_SECRET_NAME" -n minio -o jsonpath='{.data.config\.env}' | base64 -d); then
-    echo "ERROR: Failed to retrieve MinIO secret configuration"
+    echo "ERROR: Failed to retrieve MinIO secret '$MINIO_SECRET_NAME' configuration"
     exit 1
   fi
   
