@@ -49,8 +49,8 @@ fi
 # Wait for MinIO to be ready
 wait_for_minio_ready
 
-# Create MinIO policy
-create_minio_policy "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
+# Configure MinIO policies and buckets
+configure_minio_policies
 
 # Start port-forward for MinIO console
 start_port_forward

@@ -12,8 +12,43 @@ check_keycloak_status() {
   echo "✓ Keycloak is running"
 }
 
+# Ensure Keycloak port-forward is active
+ensure_keycloak_port_forward() {
+  echo "Checking Keycloak port-forward..."
+  
+  # Check if port-forward is already running
+  if ps aux | grep -q "[k]ubectl port-forward -n operators svc/keycloak-service 8080"; then
+    echo "✓ Keycloak port-forward already running"
+    return 0
+  fi
+  
+  # Check if port 8080 is accessible
+  if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null | grep -q "200\|302\|401"; then
+    echo "✓ Keycloak accessible on localhost:8080"
+    return 0
+  fi
+  
+  # Start port-forward
+  echo "Starting Keycloak port-forward..."
+  pkill -f "kubectl port-forward -n operators svc/keycloak-service" 2>/dev/null || true
+  nohup kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0 > /dev/null 2>&1 &
+  sleep 3
+  
+  # Verify it's working
+  if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null | grep -q "200\|302\|401"; then
+    echo "✓ Keycloak port-forward started successfully"
+  else
+    echo "ERROR: Failed to start Keycloak port-forward"
+    echo "Please run: kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0"
+    exit 1
+  fi
+}
+
 # Authenticate with Keycloak and get access token
 authenticate_keycloak() {
+  # Ensure port-forward is active
+  ensure_keycloak_port_forward
+  
   echo "Authenticating with Keycloak..."
   KEYCLOAK_USER=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d)
   KEYCLOAK_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
@@ -139,6 +174,26 @@ deploy_minio_operator() {
   echo "Installing/Upgrading MinIO Operator..."
   helm upgrade --install minio-operator minio-operator/operator -n minio-operator -f helm/minio/operator-values.yaml --wait
   
+  # Create STS TLS certificate if it doesn't exist
+  echo "Checking for STS TLS certificate..."
+  if ! kubectl get secret sts-tls -n minio-operator >/dev/null 2>&1; then
+    echo "Creating STS TLS certificate..."
+    openssl req -x509 -newkey rsa:2048 -keyout /tmp/sts-key.pem -out /tmp/sts-cert.pem -days 365 -nodes \
+      -subj "/CN=sts" \
+      -addext "subjectAltName=DNS:sts,DNS:sts.minio-operator.svc,DNS:sts.minio-operator.svc.cluster.local" 2>/dev/null
+    
+    kubectl create secret tls sts-tls -n minio-operator --cert=/tmp/sts-cert.pem --key=/tmp/sts-key.pem
+    rm -f /tmp/sts-key.pem /tmp/sts-cert.pem
+    echo "✓ STS TLS certificate created"
+    
+    # Restart operator to pick up the certificate
+    echo "Restarting operator to pick up certificate..."
+    kubectl rollout restart deployment/minio-operator -n minio-operator
+    kubectl rollout status deployment/minio-operator -n minio-operator --timeout=60s
+  else
+    echo "✓ STS TLS certificate already exists"
+  fi
+  
   echo "✓ MinIO Operator ready"
 }
 
@@ -148,8 +203,29 @@ deploy_minio_tenant() {
   echo "Deploying MinIO Tenant..."
   kubectl create namespace minio --dry-run=client -o yaml | kubectl apply -f -
   
-  # Pass OIDC secret via --set
+  # Create tenant TLS certificate if it doesn't exist (required for STS communication)
+  echo "Checking for tenant TLS certificate..."
+  if ! kubectl get secret minio-tls -n minio >/dev/null 2>&1; then
+    echo "Creating tenant TLS certificate..."
+    openssl req -x509 -newkey rsa:2048 -keyout /tmp/minio-key.pem -out /tmp/minio-cert.pem -days 365 -nodes \
+      -subj "/CN=minio.minio.svc.cluster.local" \
+      -addext "subjectAltName=DNS:minio.minio.svc.cluster.local,DNS:*.minio.minio.svc.cluster.local,DNS:*.minio-hl.minio.svc.cluster.local,DNS:minio-console.minio.svc.cluster.local" 2>/dev/null
+    
+    # MinIO expects public.crt and private.key (not tls.crt and tls.key)
+    kubectl create secret generic minio-tls -n minio \
+      --from-file=public.crt=/tmp/minio-cert.pem \
+      --from-file=private.key=/tmp/minio-key.pem
+    rm -f /tmp/minio-key.pem /tmp/minio-cert.pem
+    echo "✓ Tenant TLS certificate created"
+  else
+    echo "✓ Tenant TLS certificate already exists"
+  fi
+  
+  # Pass OIDC secret and explicitly disable requestAutoCert via --set
   helm upgrade --install minio minio-operator/tenant -n minio -f helm/minio/tenant-values.yaml \
+    --set tenant.requestAutoCert=false \
+    --set tenant.externalCertSecret[0].name=minio-tls \
+    --set tenant.externalCertSecret[0].type=kubernetes.io/tls \
     --set tenant.configuration.envs[2].name=MINIO_IDENTITY_OPENID_CLIENT_ID \
     --set tenant.configuration.envs[2].value=minio \
     --set tenant.configuration.envs[3].name=MINIO_IDENTITY_OPENID_CLIENT_SECRET \
@@ -242,8 +318,57 @@ extract_minio_credentials() {
   if [ -z "$MINIO_ROOT_USER" ]; then
       echo "WARNING: Could not auto-detect MinIO root credentials."
   else
-      echo "✓ Detected MinIO Root Credentials"
+      echo "✓ Extracted MinIO credentials (User: $MINIO_ROOT_USER)"
   fi
+}
+
+# Configure MinIO policies and buckets
+configure_minio_policies() {
+  echo "Configuring MinIO policies and buckets..."
+  
+  # Wait for MinIO to be fully ready
+  echo "Waiting for MinIO to be ready..."
+  sleep 10
+  
+  # Set up mc alias
+  echo "Setting up MinIO client alias..."
+  kubectl exec -n minio minio-pool-0-0 -c minio -- mc alias set myminio https://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" --insecure 2>/dev/null || {
+    echo "WARNING: Failed to set up mc alias, retrying..."
+    sleep 5
+    kubectl exec -n minio minio-pool-0-0 -c minio -- mc alias set myminio https://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" --insecure
+  }
+  
+  # Create minio-access policy
+  echo "Creating minio-access policy..."
+  kubectl exec -n minio minio-pool-0-0 -c minio -- sh -c 'cat > /tmp/minio-access-policy.json << "EOFPOLICY"
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:*"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*"
+      ]
+    }
+  ]
+}
+EOFPOLICY
+mc admin policy create myminio minio-access /tmp/minio-access-policy.json --insecure 2>/dev/null || echo "Policy minio-access may already exist"'
+  
+  # Verify default bucket exists
+  echo "Verifying default bucket..."
+  if kubectl exec -n minio minio-pool-0-0 -c minio -- mc ls myminio/default-bucket --insecure 2>/dev/null; then
+    echo "✓ Default bucket 'default-bucket' exists"
+  else
+    echo "Creating default bucket..."
+    kubectl exec -n minio minio-pool-0-0 -c minio -- mc mb myminio/default-bucket --insecure
+    echo "✓ Created default bucket 'default-bucket'"
+  fi
+  
+  echo "✓ MinIO policies and buckets configured"
 }
 
 # Store MinIO credentials in Vault
