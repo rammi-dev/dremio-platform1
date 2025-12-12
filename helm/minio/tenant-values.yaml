@@ -19,7 +19,7 @@ tenant:
   
   buckets:
     - name: default-bucket
-      region: us-east-1
+    - name: user-data
 
   
   configSecret:
@@ -55,3 +55,9 @@ tenant:
       requests:
         cpu: 50m
         memory: 64Mi
+
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+

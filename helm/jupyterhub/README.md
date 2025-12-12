@@ -606,6 +606,66 @@ s3 = boto3.client('s3',
 
 # List buckets
 response = s3.list_buckets()
+
+### Policy Mappings
+
+| Keycloak Group | MinIO Policy | Permissions |
+|----------------|--------------|-------------|
+| `data-science` | `data-science` | **Full S3 Access** (`s3:*`) to all buckets. |
+| `admin`        | `admin`        | **Full System Access** (`s3:*`, `admin:*`). |
+| `vault-admins` | `vault-admins` | Alias for `admin` policy. |
+
+**Configuration Method:**
+- Keycloak Realm/Users: Declarative `KeycloakRealmImport` (CRD)
+- MinIO Tenants: Declarative `Tenant` (CRD)
+- MinIO Policies: Scripted via `deploy-minio-gke.sh` (using `mc`)
+
+## Dynamic Profiles (RBAC)
+
+JupyterHub is configured with dynamic profile selection based on Keycloak group membership.
+
+### Available Profiles
+
+| Profile | Specs | Access Requirement |
+|---------|-------|--------------------|
+| **Small** | 0.5 CPU, 1Gi RAM | Available to **Everyone** |
+| **Large** | 2 CPU, 4Gi RAM | Requires `data-science` or `admin` group |
+| **GPU** | 4 CPU, 8Gi RAM (+GPU) | Requires `gpu-users` or `admin` group |
+
+### Configuration Logic
+
+The profile list is generated dynamically by a Python function in `hub.extraConfig`:
+1. **User Login:** JupyterHub receives `groups` from Keycloak ID Token.
+2. **Profile Filter:** The `profile_list` function filters available options:
+   - "Small" is always added.
+   - "Large" is added if user is in `admin` or `data-science`.
+   - "GPU" is added if user is in `admin` or `gpu-users`.
+3. **Selection:** User selects profile from dropdown on startup.
+
+### Custom Startup Behavior
+
+Each profile injects a `PROFILE_NAME` environment variable. A custom `postStart` hook or startup script can use this to customize the environment (e.g., installing specific libraries for GPU profile).
+
+### How it works
+1. **Authentication**: User logs in via Keycloak.
+2. **Token Generation**: Keycloak generates an ID token containing the `groups` claim (e.g., `["data-science"]`).
+3. **STS Call**: JupyterHub sends this token to MinIO's STS endpoint (`AssumeRoleWithWebIdentity`).
+4. **Policy Lookup**: MinIO looks for a policy named `data-science`.
+5. **Authorization**: If found, MinIO returns temporary credentials with those permissions. If NOT found, STS fails with `InvalidParameterValue`.
+
+### Manual Policy Management
+Policies are automatically configured during deployment. To manage them manually:
+
+```bash
+# 1. Port-forward MinIO API
+kubectl port-forward -n minio svc/minio 9000:443
+
+# 2. Configure mc alias
+mc alias set myminio https://localhost:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD --insecure
+
+# 3. Create/Update Policy
+mc admin policy create myminio data-science policy.json
+```
 print(response['Buckets'])
 
 # Upload file
@@ -726,5 +786,5 @@ df.to_csv(
 2. Configure custom user images with pre-installed packages
 3. Set up user-specific bucket prefixes
 4. Integrate with Dremio for data analytics
-5. Add GPU support for ML workloads
+5. Add network policies for stricter isolation
 6. Configure external access (Ingress)

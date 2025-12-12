@@ -49,7 +49,7 @@ fi
 # Wait for MinIO to be ready
 wait_for_minio_ready
 
-# Configure MinIO policies and buckets
+# Configure MinIO policies
 configure_minio_policies
 
 # Start port-forward for MinIO console

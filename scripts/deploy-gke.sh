@@ -157,110 +157,34 @@ echo ""
 
 # Step 10: Configure Keycloak for Vault
 echo "Step 10: Configuring Keycloak vault realm..."
-sleep 2
+kubectl apply -f helm/keycloak/manifests/keycloak-realm-import.yaml
 
-TOKEN_RESPONSE=$(curl -s -X POST "http://localhost:8080/realms/master/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=$KEYCLOAK_USER" \
-  -d "password=$KEYCLOAK_PASS" \
-  -d "grant_type=password" \
-  -d "client_id=admin-cli")
+echo "Waiting for Keycloak Realm Import to complete..."
+# Wait loop for realm import status
+for i in {1..20}; do
+  STATUS=$(kubectl get keycloakrealmimport/vault-realm-import -n operators -o jsonpath='{.status.conditions[?(@.type=="Done")].status}' 2>/dev/null || echo "False")
+  if [ "$STATUS" == "True" ]; then
+    echo "✓ Keycloak Realm 'vault' imported successfully"
+    break
+  fi
+  # Also check for Error state
+  ERR_STATUS=$(kubectl get keycloakrealmimport/vault-realm-import -n operators -o jsonpath='{.status.conditions[?(@.type=="HasErrors")].status}' 2>/dev/null || echo "False")
+  if [ "$ERR_STATUS" == "True" ]; then
+    echo "ERROR: Keycloak Realm Import failed!"
+    kubectl get keycloakrealmimport/vault-realm-import -n operators -o yaml
+    exit 1
+  fi
+  echo "Waiting for Realm Import... ($i/20)"
+  sleep 3
+done
 
-ACCESS_TOKEN=$(echo $TOKEN_RESPONSE | jq -r ".access_token")
+# Export client secrets for Vault (now hardcoded/known from manifest, or we can fetch)
+# Since we specificed secrets in manifest (e.g., 'vault-secret'), we know them.
+# But for continuity, let's just write the known secret to the file.
+echo "vault-secret" > config/keycloak-vault-client-secret.txt
 
-if [ "$ACCESS_TOKEN" == "null" ] || [ -z "$ACCESS_TOKEN" ]; then
-  echo "ERROR: Failed to authenticate with Keycloak"
-  exit 1
-fi
-
-# Create vault realm
-curl -s -X POST "http://localhost:8080/admin/realms" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"realm": "vault", "enabled": true, "displayName": "Vault"}' > /dev/null
-
-# Create OIDC client
-curl -s -X POST "http://localhost:8080/admin/realms/vault/clients" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"clientId": "vault", "name": "HashiCorp Vault", "enabled": true, "protocol": "openid-connect", "publicClient": false, "directAccessGrantsEnabled": true, "standardFlowEnabled": true, "redirectUris": ["http://localhost:8200/ui/vault/auth/oidc/oidc/callback", "http://127.0.0.1:8200/ui/vault/auth/oidc/oidc/callback", "http://localhost:8250/oidc/callback"], "webOrigins": ["+"]}' > /dev/null
-
-CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=vault" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
-
-CLIENT_SECRET=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/client-secret" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.value')
-
-echo "$CLIENT_SECRET" > config/keycloak-vault-client-secret.txt
-
-# Create vault-admins group
-# Create vault-admins group
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080/admin/realms/vault/groups" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "vault-admins"}')
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  echo "ERROR: Failed to create vault-admins group in Keycloak (HTTP $HTTP_CODE)"
-  exit 1
-fi
-
-GROUP_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/groups?search=vault-admins" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
-if [[ -z "$GROUP_ID" || "$GROUP_ID" == "null" ]]; then
-  echo "ERROR: Failed to retrieve vault-admins group ID from Keycloak"
-  exit 1
-fi
-
-# Create admin user
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080/admin/realms/vault/users" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "email": "admin@vault.local", "enabled": true, "emailVerified": true}')
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  echo "ERROR: Failed to create admin user in Keycloak (HTTP $HTTP_CODE)"
-  exit 1
-fi
-
-USER_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/users?username=admin" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq -r '.[0].id')
-if [[ -z "$USER_ID" || "$USER_ID" == "null" ]]; then
-  echo "ERROR: Failed to retrieve admin user ID from Keycloak"
-  exit 1
-fi
-
-# Set password
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/reset-password" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"type": "password", "value": "admin", "temporary": false}')
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  echo "ERROR: Failed to set password for admin user in Keycloak (HTTP $HTTP_CODE)"
-  exit 1
-fi
-
-# Add user to group
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/groups/$GROUP_ID" \
-  -H "Authorization: Bearer $ACCESS_TOKEN")
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  echo "ERROR: Failed to add admin user to vault-admins group in Keycloak (HTTP $HTTP_CODE)"
-  exit 1
-fi
-
-# Add group mapper
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/protocol-mappers/models" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "config": {"full.path": "false", "id.token.claim": "true", "access.token.claim": "true", "claim.name": "groups", "userinfo.token.claim": "true"}}')
-if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
-  echo "ERROR: Failed to add group mapper to Keycloak client (HTTP $HTTP_CODE)"
-  exit 1
-fi
+CLIENT_SECRET="vault-secret"
 echo "✓ Keycloak vault realm configured"
-echo "  - Realm: vault"
-echo "  - OIDC Client: vault"
-echo "  - Client Secret: $CLIENT_SECRET"
-echo "  - Group: vault-admins"
-echo "  - User: admin / admin"
 echo ""
 
 # Step 11: Configure Vault OIDC
@@ -278,11 +202,20 @@ kubectl exec -n vault vault-0 -- vault login $ROOT_TOKEN > /dev/null
 
 kubectl exec -n vault vault-0 -- vault auth enable oidc > /dev/null 2>&1 || true
 
-kubectl exec -n vault vault-0 -- vault write auth/oidc/config \
-    oidc_discovery_url="http://keycloak-service.operators.svc.cluster.local:8080/realms/vault" \
-    oidc_client_id="vault" \
-    oidc_client_secret="$CLIENT_SECRET" \
-    default_role="admin" > /dev/null
+# Retry loop for Vault OIDC configuration (can fail due to Keycloak/DNS timing)
+echo "Configuring Vault OIDC (with retry)..."
+for i in {1..10}; do
+  if kubectl exec -n vault vault-0 -- vault write auth/oidc/config \
+      oidc_discovery_url="http://keycloak-service.operators.svc.cluster.local:8080/realms/vault" \
+      oidc_client_id="vault" \
+      oidc_client_secret="$CLIENT_SECRET" \
+      default_role="admin" > /dev/null 2>&1; then
+    echo "✓ Vault auth/oidc/config written"
+    break
+  fi
+  echo "Waiting for Keycloak OIDC endpoint... ($i/10)"
+  sleep 5
+done
 
 kubectl exec -n vault vault-0 -- vault policy write admin /tmp/admin-policy.hcl > /dev/null
 

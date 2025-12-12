@@ -235,6 +235,83 @@ deploy_minio_tenant() {
   echo "✓ MinIO Tenant deployed"
 }
 
+# Configure MinIO policies and buckets (RESTORED: Script-based)
+configure_minio_policies() {
+  echo "Configuring MinIO policies using 'kubectl run' (ephemeral pod)..."
+  
+  # Wait for MinIO to be fully ready
+  sleep 5
+  
+  # Get Credentials
+  extract_minio_credentials # Populates MINIO_ROOT_USER and MINIO_ROOT_PASSWORD
+
+  # We use a single ephemeral pod to run all mc commands to avoid multiple pod startups
+  # Policies: data-science (s3:*), admin (s3:* + admin:*), vault-admins, admins
+  
+  echo "Applying MinIO Policies..."
+  kubectl run minio-policy-setup-v2 --image=minio/mc:latest --restart=Never --rm -i --command -- /bin/bash -c "
+    set -e
+    echo 'Connecting to MinIO...'
+    # Retry loop for connection
+    for i in {1..30}; do
+      if mc alias set myminio https://minio.minio.svc.cluster.local:443 '$MINIO_ROOT_USER' '$MINIO_ROOT_PASSWORD' --insecure; then
+        echo 'Connected to MinIO'
+        break
+      fi
+      echo 'Waiting for MinIO... (\$i/30)'
+      sleep 2
+    done
+
+    # Data Science Policy
+    echo 'Creating data-science policy...'
+    cat <<EOF > /tmp/policy-ds.json
+{
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"s3:*\"],
+      \"Resource\": [\"arn:aws:s3:::*\"]
+    }
+  ]
+}
+EOF
+    mc admin policy create myminio data-science /tmp/policy-ds.json --insecure || true
+
+    # Admin Policy (Full Admin)
+    echo 'Creating admin policies...'
+    cat <<EOF > /tmp/policy-admin.json
+{
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"s3:*\"],
+      \"Resource\": [\"arn:aws:s3:::*\"]
+    },
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"admin:*\"],
+      \"Resource\": [\"arn:aws:s3:::*\"]
+    }
+  ]
+}
+EOF
+    mc admin policy create myminio admin /tmp/policy-admin.json --insecure || true
+    mc admin policy create myminio vault-admins /tmp/policy-admin.json --insecure || true
+    mc admin policy create myminio admins /tmp/policy-admin.json --insecure || true
+
+    echo '✓ Policies Configured'
+  "
+
+  # Check if the ephemeral pod succeeded (it wraps errors with || true for policies but set -e catches other failures)
+  if [ $? -eq 0 ]; then
+    echo "✓ MinIO Policies configured successfully via script"
+  else
+    echo "WARNING: MinIO Policy configuration script failed"
+  fi
+}
+
 # Configure OIDC for MinIO
 configure_minio_oidc() {
   local client_secret=$1
@@ -322,54 +399,7 @@ extract_minio_credentials() {
   fi
 }
 
-# Configure MinIO policies and buckets
-configure_minio_policies() {
-  echo "Configuring MinIO policies and buckets..."
-  
-  # Wait for MinIO to be fully ready
-  echo "Waiting for MinIO to be ready..."
-  sleep 10
-  
-  # Set up mc alias
-  echo "Setting up MinIO client alias..."
-  kubectl exec -n minio minio-pool-0-0 -c minio -- mc alias set myminio https://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" --insecure 2>/dev/null || {
-    echo "WARNING: Failed to set up mc alias, retrying..."
-    sleep 5
-    kubectl exec -n minio minio-pool-0-0 -c minio -- mc alias set myminio https://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" --insecure
-  }
-  
-  # Create minio-access policy
-  echo "Creating minio-access policy..."
-  kubectl exec -n minio minio-pool-0-0 -c minio -- sh -c 'cat > /tmp/minio-access-policy.json << "EOFPOLICY"
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:*"
-      ],
-      "Resource": [
-        "arn:aws:s3:::*"
-      ]
-    }
-  ]
-}
-EOFPOLICY
-mc admin policy create myminio minio-access /tmp/minio-access-policy.json --insecure 2>/dev/null || echo "Policy minio-access may already exist"'
-  
-  # Verify default bucket exists
-  echo "Verifying default bucket..."
-  if kubectl exec -n minio minio-pool-0-0 -c minio -- mc ls myminio/default-bucket --insecure 2>/dev/null; then
-    echo "✓ Default bucket 'default-bucket' exists"
-  else
-    echo "Creating default bucket..."
-    kubectl exec -n minio minio-pool-0-0 -c minio -- mc mb myminio/default-bucket --insecure
-    echo "✓ Created default bucket 'default-bucket'"
-  fi
-  
-  echo "✓ MinIO policies and buckets configured"
-}
+# Function configure_minio_policies removed in favor of declarative Job
 
 # Store MinIO credentials in Vault
 store_credentials_in_vault() {

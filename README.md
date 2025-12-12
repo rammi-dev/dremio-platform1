@@ -1,211 +1,119 @@
-# Keycloak & Vault on Minikube
+# Production Platform on GKE
 
-Production-ready deployment of Keycloak and HashiCorp Vault on Minikube with OIDC integration and full data persistence.
+A production-ready data platform deployed on Google Kubernetes Engine (GKE), integrating **JupyterHub**, **MinIO**, **Keycloak**, and **Vault**.
 
-## Features
+| Component | Purpose | Details |
+|-----------|---------|---------|
+| **JupyterHub** | Data Science Environment | Dynamic profiles (Small/Large/GPU), RBAC |
+| **MinIO** | Object Storage (S3) | High-performance, OIDC-integrated, Multi-tenant |
+| **Keycloak** | Identity & Access (IAM) | OIDC Provider, User Federation, RBAC |
+| **Vault** | Secret Management | Centralized secret storage, OIDC auth |
 
-- ✅ **Full Data Persistence**: PostgreSQL (2Gi) and Vault (1Gi) with persistent storage
-- ✅ **OIDC Integration**: Vault authenticates via Keycloak
-- ✅ **Multi-Environment Support**: Minikube profiles for dev/staging/prod
-- ✅ **Automated Deployment**: One-command setup
-- ✅ **Production-Ready**: StatefulSets with persistent volumes
+## 🚀 Quick Start (GKE)
 
-## Quick Start
+### 1. Prerequisites
+- GKE Cluster (Standard or Autopilot)
+- `kubectl` configured for the cluster
+- `helm` installed
+- `jq` installed
+
+**Setup Cluster Context:**
+```bash
+gcloud container clusters get-credentials data-cluster-gke1 --zone europe-central2-b
+```
+
+### 2. Full Deployment
+Run the automated deployment scripts in order:
 
 ```bash
-# Deploy everything
-./scripts/deploy.sh
+# 1. Deploy Core Infrastructure (Keycloak & Vault)
+./scripts/deploy-gke.sh
 
-# Access services
-# Keycloak: http://localhost:8080
-# Vault: http://localhost:8200
+# 2. Deploy MinIO Tenant (S3 Storage)
+./scripts/deploy-minio-gke.sh
+
+# 3. Deploy JupyterHub (Data Science Environment)
+./scripts/deploy-jupyterhub-gke.sh
 ```
 
-## Architecture
+### 3. Access Services
 
-```
-┌─────────────────────────────────────────┐
-│         Minikube (keycloak-vault)       │
-│                                         │
-│  ┌──────────────┐    ┌──────────────┐  │
-│  │  Keycloak    │◄───┤    Vault     │  │
-│  │  + PostgreSQL│OIDC│              │  │
-│  │  (2Gi PV)    │    │  (1Gi PV)    │  │
-│  └──────────────┘    └──────────────┘  │
-└─────────────────────────────────────────┘
-```
+| Service | Local URL (after port-forward) | Default Creds |
+|---------|--------------------------------|---------------|
+| **JupyterHub** | http://localhost:8000 | Login via Keycloak |
+| **Keycloak** | http://localhost:8080 | `admin` / `admin` (Vault Realm) |
+| **MinIO Console** | http://localhost:9091 | Login via OIDC |
+| **Vault** | http://localhost:8200 | Token in `config/vault-keys.json` |
 
-## Prerequisites
+---
 
-- Minikube
-- kubectl
-- Helm
-- jq
-- curl
+## 🏗️ Architecture
 
-**Windows Users**: See [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for required hosts file configuration.
-
-## Usage
-
-### Initial Deployment
-
-```bash
-# Default profile (keycloak-vault)
-./scripts/deploy.sh
-
-# Custom profile
-MINIKUBE_PROFILE=my-env ./scripts/deploy.sh
+```mermaid
+graph TD
+    User[User] -->|OIDC Auth| KC[Keycloak]
+    User -->|Login| JH[JupyterHub]
+    
+    JH -->|Spawn| NB[Notebook Pod]
+    NB -->|Assume Role| STS[MinIO STS]
+    STS -->|Verify Token| KC
+    STS -->|Issue Creds| NB
+    
+    NB -->|S3 API| MinIO[MinIO Tenant]
+    KC -->|Policy Mapping| MinIO
 ```
 
-### After Restart
+### Integration Flow
+1. **Authentication**: User logs into JupyterHub via Keycloak.
+2. **Identity**: Keycloak issues an ID Token with user groups (e.g., `data-science`).
+3. **Storage Access**: JupyterHub hooks exchange this ID Token for temporary **MinIO STS Credentials**.
+4. **Notebook**: The Notebook pod starts with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `S3_ENDPOINT` injected.
+5. **Authorization**: MinIO applies policies based on Keycloak groups (e.g., `data-science` group -> `data-science` policy).
 
-```bash
-# Restart everything (unseal Vault, start port-forwards)
-./scripts/restart.sh
-```
+---
 
-### Multiple Environments
+## 🔒 Configuration & RBAC
 
-```bash
-# Create different profiles
-minikube start -p dev --cpus 2 --memory 4096
-minikube start -p staging --cpus 4 --memory 8192
+### Keycloak (Declarative)
+Configuration is managed via the **Keycloak Realm CRD** (`helm/keycloak/manifests/keycloak-realm-import.yaml`).
+- **Users**: `admin`, `jupyter-admin`, `jupyter-ds`
+- **Groups**: `admin`, `data-science`, `vault-admins`
 
-# Switch between them
-./scripts/switch-env.sh dev
-./scripts/switch-env.sh staging
-```
+### MinIO Policies (Scripted)
+Policies are applied automatically by `deploy-minio-gke.sh`:
+- **data-science**: Full S3 access to all buckets.
+- **admin**: Full System Access.
 
-## Access
+### JupyterHub Profiles
+Machine profiles are dynamically available based on group membership:
+- **Small** (0.5 CPU, 1G RAM): Everyone
+- **Large** (2 CPU, 4G RAM): `data-science` group
+- **GPU** (4 CPU, 8G RAM): `gpu-users` group
 
-### Keycloak
+---
 
-> **Important**: Keycloak has **two separate realms** with different credentials:
-
-**Master Realm** (Keycloak Admin Console):
-- **URL**: http://localhost:8080
-- **Username**: `temp-admin`
-- **Password**: *Dynamically generated* - retrieve with:
-  ```bash
-  kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d
-  ```
-
-**Vault Realm** (Application Users):
-- **URL**: http://localhost:8080/realms/vault
-- **Username**: `admin`
-- **Password**: `admin`
-- **Purpose**: Login to Vault and MinIO via OIDC
-- **Note**: This user does NOT work for the master realm admin console
-
-### Vault
-- **URL**: http://localhost:8200
-- **Root Token**: See `config/vault-keys.json`
-- **OIDC Login**: Method=OIDC, Role=`admin`, then login with `admin`/`admin`
-
-## Documentation
-
-- **[GKE_DEPLOYMENT_GUIDE.md](docs/GKE_DEPLOYMENT_GUIDE.md)** - Complete GKE deployment and testing guide
-- **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick access to all credentials and commands
-- **[CREDENTIALS.md](docs/CREDENTIALS.md)** - All access credentials and URLs
-- **[setup_guide.md](docs/setup_guide.md)** - Detailed step-by-step setup
-- **[RESTART_GUIDE.md](docs/RESTART_GUIDE.md)** - Restart procedure
-- **[MULTI_CLUSTER.md](docs/MULTI_CLUSTER.md)** - Managing multiple environments
-- **[OIDC_LOGIN_GUIDE.md](docs/OIDC_LOGIN_GUIDE.md)** - OIDC login troubleshooting
-- **[WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** - Windows-specific configuration
-- **[walkthrough.md](docs/walkthrough.md)** - Complete deployment walkthrough
-
-
-## Scripts
-
-- **[deploy.sh](scripts/deploy.sh)** - Complete automated deployment (all-in-one)
-- **[restart.sh](scripts/restart.sh)** - Restart after `minikube stop`
-- **[switch-env.sh](scripts/switch-env.sh)** - Switch between profiles
-
-## Data Persistence
-
-All data persists across Minikube restarts:
-
-- **PostgreSQL**: 2Gi persistent volume (Keycloak realms, users, clients)
-- **Vault**: 1Gi persistent volume (secrets, OIDC config, policies)
-
-After `minikube stop` and `minikube start`, just run `./scripts/restart.sh` to unseal Vault and restart port-forwards. No reconfiguration needed!
-
-## Project Structure
+## 📂 Project Structure
 
 ```
-.
-├── helm/                   # Helm charts and Kubernetes manifests
-│   ├── vault/
-│   │   └── values.yaml     # Vault Helm values
-│   ├── keycloak/
-│   │   ├── values.yaml     # Keycloak Helm values
-│   │   └── manifests/      # Keycloak K8s manifests
-│   │       ├── keycloak-crd.yml
-│   │       ├── keycloak-realm-crd.yml
-│   │       ├── keycloak-operator.yml
-│   │       └── keycloak-instance.yaml
-│   └── postgres/
-│       ├── values.yaml                 # PostgreSQL configuration
-│       └── postgres-for-keycloak.yaml  # PostgreSQL for Keycloak
-├── scripts/                # Deployment and management scripts
-│   ├── deploy.sh           # Main deployment script
-│   ├── restart.sh          # Restart script
-│   └── switch-env.sh       # Profile switcher
-├── docs/                   # Documentation
-│   ├── CREDENTIALS.md      # Access credentials
-│   ├── setup_guide.md      # Detailed setup guide
-│   ├── RESTART_GUIDE.md    # Restart instructions
-│   └── *.md                # Other guides
-├── config/                 # Generated configuration (gitignored)
-│   ├── vault-keys.json     # Vault credentials
-│   └── keycloak-vault-client-secret.txt
-└── README.md               # This file
+├── helm/
+│   ├── jupyterhub/    # JupyterHub Chart & Values
+│   ├── keycloak/      # Keycloak Operator & Manifests
+│   ├── minio/         # MinIO Operator & Tenant Config
+│   └── vault/         # Vault Helm Config
+├── scripts/
+│   ├── deploy-gke.sh              # Core Deployment
+│   ├── deploy-minio-gke.sh        # MinIO Deployment
+│   ├── deploy-jupyterhub-gke.sh   # JupyterHub Deployment
+│   └── lib/                       # Shared Bash Functions
+└── README-MINIKUBE.md             # Local Development Guide
 ```
 
-## Troubleshooting
+## 🛠️ Local Development
 
-### Vault OIDC Login Fails
-- Ensure role is set to `admin`
-- Windows: Check hosts file (see [WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md))
-- Verify port-forwards are running
+For deployment on **Minikube**, please refer to:
+👉 **[README-MINIKUBE.md](README-MINIKUBE.md)**
 
-### After Restart
-- Vault will be sealed - run `./scripts/restart.sh`
-- Port-forwards need to be restarted
-- All data persists automatically
-
-### Feature: MinIO Object Storage (Add-on)
-This project includes an optional MinIO integration with OIDC authentication (via Keycloak).
-
-See **[helm/minio/README.md](helm/minio/README.md)** for deployment, access, and troubleshooting instructions.
-
-**Quick Command:**
-```bash
-./scripts/deploy-minio.sh
-```
-### Multiple Clusters
-- Use different profiles: `minikube start -p <name>`
-- Switch with: `./scripts/switch-env.sh <name>`
-- See [MULTI_CLUSTER.md](docs/MULTI_CLUSTER.md) for details
-
-## Clean Up
-
-```bash
-# Delete specific profile
-minikube delete -p keycloak-vault
-
-# Delete all
-minikube delete --all
-```
-
-## Important Files
-
-Generated during deployment (stored in `config/`):
-- `config/vault-keys.json` - Vault root token and unseal key
-- `config/keycloak-vault-client-secret.txt` - OIDC client secret
-
-(Note: These files are generated by `scripts/deploy.sh` and are ignored by `.gitignore` for security.)
+---
 
 ## License
-
-This is a reference implementation for development and testing purposes.
+Reference implementation for Data Platform deployment.

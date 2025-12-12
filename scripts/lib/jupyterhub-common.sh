@@ -74,7 +74,7 @@ configure_jupyterhub_keycloak_client() {
       
     # Update redirect URIs to include both MinIO and JupyterHub
     # Using jq to merge new URIs into existing list
-    echo "$CURRENT_CONFIG" | jq '.redirectUris += ["http://jupyterhub.local:8000/hub/oauth_callback", "http://localhost:8000/hub/oauth_callback", "http://*:8000/hub/oauth_callback"] | .redirectUris |= unique' > /tmp/minio_client_update.json
+    echo "$CURRENT_CONFIG" | jq '.redirectUris += ["http://jupyterhub.local:8000", "http://localhost:8000", "http://jupyterhub.local:8000/hub/oauth_callback", "http://localhost:8000/hub/oauth_callback", "http://*:8000/hub/oauth_callback"] | .redirectUris |= unique' > /tmp/minio_client_update.json
     
     curl -s -X PUT "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID" \
       -H "Authorization: Bearer $access_token" \
