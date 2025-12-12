@@ -16,6 +16,7 @@ kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0
 kubectl port-forward -n vault svc/vault-ui 8200:8200 --address=0.0.0.0 > /dev/null 2>&1 &
 kubectl port-forward -n minio svc/minio-console 9091:9443 --address=0.0.0.0 > /dev/null 2>&1 &
 kubectl port-forward -n minio svc/minio 9000:443 --address=0.0.0.0 > /dev/null 2>&1 &
+kubectl port-forward -n jupyterhub svc/proxy-public 8000:80 --address=0.0.0.0 > /dev/null 2>&1 &
 
 sleep 3
 
@@ -42,6 +43,10 @@ echo "MinIO API:"
 echo "  URL:      https://localhost:9000"
 echo "  Username: $MINIO_ROOT_USER"
 echo "  Password: $MINIO_ROOT_PASSWORD"
+echo ""
+echo "JupyterHub:"
+echo "  URL:      http://localhost:8000"
+echo "  Login:    Sign in with Keycloak (admin/admin)"
 echo ""
 echo "========================================="
 echo ""
