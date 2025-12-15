@@ -44,12 +44,12 @@ hub:
   
   # Additional configuration for OAuth state cookies
   extraConfig:
-    cookie_options: |
-      # Disable SameSite for OAuth state cookies to work with localhost
-      c.JupyterHub.cookie_options = {
-          'SameSite': 'None',
-          'Secure': False,  # Allow cookies over HTTP for localhost
-      }
+    oauth_config: |
+      # Disable OAuth state cookie (browser blocking issue)
+      # This is less secure but works around cookie restrictions
+      c.GenericOAuthenticator.manage_state = False
+    
+    
     
     pre_spawn_hook: |
       import requests

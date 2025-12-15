@@ -29,12 +29,30 @@ Run the automated deployment scripts in order:
 # 1. Deploy Core Infrastructure (Keycloak & Vault)
 ./scripts/deploy-gke.sh
 
-# 2. Deploy MinIO Tenant (S3 Storage)
-./scripts/deploy-minio-gke.sh
+# 2. Deploy MinIO (Object Storage)
+helm repo add minio-operator https://operator.min.io
+helm repo update
 
-# 3. Deploy JupyterHub (Data Science Environment)
+# Install MinIO Operator
+helm install minio-operator minio-operator/operator \
+  -n minio-operator --create-namespace \
+  -f helm/minio/operator-values.yaml
+
+# Install MinIO Tenant
+helm install minio minio-operator/tenant \
+  -n minio --create-namespace \
+  -f helm/minio/tenant-values.yaml
+
+# 3. Deploy Dremio (optional)
+# First, add your Quay.io credentials to helm/dremio/.env
+./scripts/start-dremio.sh
+
+# 4. Deploy JupyterHub (optional)
 ./scripts/deploy-jupyterhub-gke.sh
 ```
+
+**📖 For detailed step-by-step instructions, see [DEPLOYMENT-GKE.md](DEPLOYMENT-GKE.md)**
+
 
 ### 3. Access Services
 
