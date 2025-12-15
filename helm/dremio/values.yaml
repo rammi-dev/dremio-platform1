@@ -1,0 +1,24 @@
+# Dremio Helm Chart Values
+
+# Namespace where Dremio will be deployed
+namespace: dremio
+
+# Image pull secret configuration
+imagePullSecret:
+  # Enable creation of image pull secret
+  enabled: true
+  # Name of the secret
+  name: dremio-pull-secret
+  # Registry configuration (populated from .env file)
+  registry: quay.io
+  username: ""
+  password: ""
+  email: "no-reply@dremio.local"
+
+# Dremio image configuration
+image:
+  repository: quay.io/dremio/dremio-oss
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Additional configuration can be added here
