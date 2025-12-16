@@ -395,7 +395,7 @@ store_credentials_in_vault() {
           access_key="$minio_user" \
           secret_key="$minio_password" \
           bucket="default-bucket" \
-          endpoint="http://minio.minio.svc.cluster.local:80" > /dev/null
+          endpoint="https://minio.minio.svc.cluster.local:443" > /dev/null
           
       echo "✓ Credentials stored in Vault at 'secret/minio'"
   else
