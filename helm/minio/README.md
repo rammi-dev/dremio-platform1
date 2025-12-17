@@ -1,6 +1,6 @@
 # MinIO Object Storage with Keycloak OIDC
 
-This add-on deploys a production-ready MinIO Tenant managed by the official MinIO Operator, fully integrated with Keycloak for OIDC authentication.
+This add-on deploys a MinIO Tenant managed by the official MinIO Operator, fully integrated with Keycloak for OIDC authentication.
 
 ## Features
 - **Official Operator**: Uses `minio-operator` and `minio-tenant` Helm charts.

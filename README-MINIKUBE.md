@@ -1,6 +1,6 @@
 # Keycloak & Vault on Minikube
 
-Production-ready deployment of Keycloak and HashiCorp Vault on Minikube with OIDC integration and full data persistence.
+Deployment of Keycloak and HashiCorp Vault on Minikube with OIDC integration and full data persistence.
 
 ## Features
 
@@ -8,7 +8,7 @@ Production-ready deployment of Keycloak and HashiCorp Vault on Minikube with OID
 - ✅ **OIDC Integration**: Vault authenticates via Keycloak
 - ✅ **Multi-Environment Support**: Minikube profiles for dev/staging/prod
 - ✅ **Automated Deployment**: One-command setup
-- ✅ **Production-Ready**: StatefulSets with persistent volumes
+- ✅ **Persistent**: StatefulSets with persistent volumes
 
 ## Quick Start
 

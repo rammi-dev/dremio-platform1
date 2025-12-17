@@ -2,7 +2,7 @@
 
 ## Repository Overview
 
-This repository provides a production-ready data platform deployed on Google Kubernetes Engine (GKE) with centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
+This repository provides a data platform deployed on Google Kubernetes Engine (GKE) with centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
 
 ## Architecture
 

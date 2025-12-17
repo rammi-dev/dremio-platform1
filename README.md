@@ -1,6 +1,6 @@
 # Data Platform on GKE
 
-A production-ready data platform deployed on Google Kubernetes Engine (GKE) with centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
+A data platform deployed on Google Kubernetes Engine (GKE) with centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
 
 ```mermaid
 graph LR

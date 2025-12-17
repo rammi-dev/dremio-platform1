@@ -2,7 +2,7 @@
 
 ## Overview
 
-A production-ready data platform on GKE providing centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
+A data platform on GKE providing centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
 
 ```mermaid
 graph TB
