@@ -2,135 +2,144 @@
 
 ## Overview
 
-This platform provides a complete data analytics environment on Kubernetes (GKE) with centralized identity management, secrets management, object storage, and data processing capabilities.
+A production-ready data platform on GKE providing centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
 
+```mermaid
+graph TB
+    subgraph External["External Access"]
+        User[👤 User]
+    end
+    
+    subgraph GKE["GKE Cluster"]
+        subgraph Identity["Identity & Security"]
+            KC[🔐 Keycloak<br/>Identity Provider]
+            Vault[🔑 Vault<br/>Secrets Manager]
+        end
+        
+        subgraph Storage["Data Storage"]
+            MinIO[📦 MinIO<br/>Object Storage]
+        end
+        
+        subgraph Compute["Data Processing"]
+            JH[📓 JupyterHub<br/>Notebooks]
+            Spark[⚡ Spark<br/>Distributed Compute]
+            Dremio[🔍 Dremio<br/>SQL Analytics]
+        end
+    end
+    
+    User -->|OIDC| KC
+    KC -->|Auth| Vault
+    KC -->|Auth| MinIO
+    KC -->|Auth| JH
+    KC -->|Auth| Dremio
+    
+    JH -->|STS Credentials| MinIO
+    Spark -->|S3 API| MinIO
+    Dremio -->|S3 API| MinIO
+    
+    Vault -->|Secrets| MinIO
+    Vault -->|Secrets| Dremio
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              GKE Cluster                                      │
-│                                                                               │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐   │
-│  │  Keycloak   │    │    Vault    │    │    MinIO    │    │   Dremio    │   │
-│  │   (IdP)     │    │  (Secrets)  │    │  (Storage)  │    │   (Query)   │   │
-│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬──────┘   │
-│         │                  │                  │                  │          │
-│         └──────────────────┴──────────────────┴──────────────────┘          │
-│                              │                                               │
-│                      ┌───────┴───────┐                                       │
-│                      │  JupyterHub   │                                       │
-│                      │ (Notebooks)   │                                       │
-│                      └───────┬───────┘                                       │
-│                              │                                               │
-│                      ┌───────┴───────┐                                       │
-│                      │Spark Operator │                                       │
-│                      │   (Compute)   │                                       │
-│                      └───────────────┘                                       │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+
+---
 
 ## Components
 
-### 1. Keycloak (Identity Provider)
-- **Purpose**: Centralized authentication and authorization
+### Identity & Security Layer
+
+#### Keycloak (Identity Provider)
+- **Purpose**: Centralized authentication and authorization via OIDC
 - **Namespace**: `operators`
 - **Storage**: PostgreSQL with 2Gi persistent volume
-- **Features**:
-  - OIDC/OAuth2 provider for all services
-  - User and group management
-  - Role-based access control (RBAC)
-  - SSO across all platform services
+- **Realm**: `vault` - contains all application users and clients
 
-### 2. HashiCorp Vault (Secrets Management)
+#### HashiCorp Vault (Secrets Manager)
 - **Purpose**: Secure storage for credentials and secrets
 - **Namespace**: `vault`
 - **Storage**: 1Gi persistent volume
-- **Features**:
-  - KV-v2 secrets engine
-  - OIDC authentication via Keycloak
-  - Stores MinIO root credentials
-  - Dynamic secrets generation
+- **Auth**: OIDC via Keycloak
 
-### 3. MinIO (Object Storage)
+### Data Storage Layer
+
+#### MinIO (Object Storage)
 - **Purpose**: S3-compatible object storage for data lake
 - **Namespace**: `minio` (tenant), `minio-operator` (operator)
-- **Features**:
-  - S3 API compatible
-  - OIDC authentication via Keycloak
-  - STS (Security Token Service) for temporary credentials
-  - Policy-based access control
+- **Auth**: OIDC via Keycloak + STS for temporary credentials
+- **Policies**: Group-based access control
 
-### 4. JupyterHub (Data Science Notebooks)
-- **Purpose**: Interactive data science environment
-- **Namespace**: `jupyterhub` (hub), `jupyterhub-users` (user pods)
-- **Features**:
-  - OAuth authentication via Keycloak
-  - Automatic MinIO STS credential injection
-  - Per-user notebook servers
-  - Pre-configured data science environment
+### Data Processing Layer
 
-### 5. Spark Operator (Distributed Computing)
+#### JupyterHub (Interactive Notebooks)
+- **Purpose**: Data science environment with per-user notebook servers
+- **Namespace**: `jupyterhub` (hub), `jupyterhub-users` (pods)
+- **Auth**: OAuth via Keycloak
+- **Features**: Auto-injected MinIO STS credentials
+
+#### Spark Operator (Distributed Computing)
 - **Purpose**: Run distributed Spark jobs on Kubernetes
 - **Namespace**: `operators`
-- **Features**:
-  - SparkApplication CRD for job management
-  - Spark Connect server support
-  - Integration with MinIO for data access
+- **Features**: SparkApplication CRD, Spark Connect support
+- **Storage**: MinIO via S3A connector
 
-### 6. Dremio (Data Lakehouse Query Engine)
-- **Purpose**: SQL query engine for data lake
+#### Dremio (SQL Analytics)
+- **Purpose**: Data lakehouse query engine with SQL interface
 - **Namespace**: `dremio`
-- **Features**:
-  - SQL interface to MinIO data
-  - Data virtualization
-  - Query acceleration
-  - OIDC authentication via Keycloak
+- **Features**: Query acceleration, data virtualization
+- **Storage**: MinIO as data source
 
 ---
 
 ## Authentication Flow
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant Service as Service<br/>(Vault/MinIO/JupyterHub/Dremio)
+    participant KC as Keycloak
+    
+    User->>Service: Access Request
+    Service->>KC: Redirect to Login
+    User->>KC: Authenticate (username/password)
+    KC->>KC: Validate Credentials
+    KC->>User: ID Token + Access Token
+    User->>Service: Token
+    Service->>KC: Validate Token
+    KC->>Service: Token Valid + User Groups
+    Service->>User: Access Granted
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                          Authentication Architecture                         │
-├────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│     User                                                                    │
-│       │                                                                     │
-│       ▼                                                                     │
-│  ┌─────────┐                                                                │
-│  │ Browser │                                                                │
-│  └────┬────┘                                                                │
-│       │                                                                     │
-│       │  1. Access Service                                                  │
-│       ▼                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         Keycloak (IdP)                               │   │
-│  │                                                                      │   │
-│  │  Realm: vault                                                        │   │
-│  │  ┌──────────────────────────────────────────────────────────────┐   │   │
-│  │  │ Clients:                                                      │   │   │
-│  │  │  • vault      → Vault OIDC login                             │   │   │
-│  │  │  • minio      → MinIO Console + STS                          │   │   │
-│  │  │  • jupyterhub → JupyterHub OAuth                             │   │   │
-│  │  │  • dremio     → Dremio OIDC (future)                         │   │   │
-│  │  └──────────────────────────────────────────────────────────────┘   │   │
-│  │  ┌──────────────────────────────────────────────────────────────┐   │   │
-│  │  │ Groups:                                                       │   │   │
-│  │  │  • vault-admins  → Full Vault access                         │   │   │
-│  │  │  • minio-access  → MinIO bucket access                       │   │   │
-│  │  │  • jupyterhub    → JupyterHub access                         │   │   │
-│  │  └──────────────────────────────────────────────────────────────┘   │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│       │                                                                     │
-│       │  2. OIDC Token                                                      │
-│       ▼                                                                     │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │              Service validates token & grants access                 │   │
-│  │                                                                      │   │
-│  │   Vault        MinIO        JupyterHub        Dremio                │   │
-│  │    ✓            ✓               ✓              (future)             │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-└────────────────────────────────────────────────────────────────────────────┘
+
+### Keycloak Configuration
+
+```mermaid
+graph LR
+    subgraph Realm["vault Realm"]
+        subgraph Clients
+            C1[vault]
+            C2[minio]
+            C3[jupyterhub]
+            C4[dremio]
+        end
+        
+        subgraph Groups
+            G1[vault-admins]
+            G2[minio-access]
+            G3[jupyterhub]
+            G4[data-science]
+        end
+        
+        subgraph Users
+            U1[admin]
+        end
+    end
+    
+    U1 --> G1
+    U1 --> G2
+    U1 --> G3
+    
+    C1 -->|OIDC| Vault[Vault]
+    C2 -->|OIDC| MinIO[MinIO]
+    C3 -->|OAuth| JH[JupyterHub]
+    C4 -->|OIDC| Dremio[Dremio]
 ```
 
 ---
@@ -139,50 +148,118 @@ This platform provides a complete data analytics environment on Kubernetes (GKE)
 
 ### JupyterHub → MinIO (STS Integration)
 
-```
-┌─────────┐     ┌─────────────┐     ┌──────────┐     ┌───────┐
-│  User   │────▶│ JupyterHub  │────▶│ Keycloak │────▶│ MinIO │
-└─────────┘     └─────────────┘     └──────────┘     └───────┘
-                      │                   │              │
-                      │  1. OAuth Login   │              │
-                      │─────────────────▶│              │
-                      │                   │              │
-                      │  2. ID Token      │              │
-                      │◀─────────────────│              │
-                      │                   │              │
-                      │  3. STS Request (ID Token)       │
-                      │─────────────────────────────────▶│
-                      │                                  │
-                      │  4. Temp Credentials             │
-                      │◀─────────────────────────────────│
-                      │                                  │
-                      │  5. Inject into Notebook env     │
-                      ▼                                  │
-               ┌─────────────┐                          │
-               │  Notebook   │  6. S3 Access            │
-               │   Server    │─────────────────────────▶│
-               └─────────────┘                          │
+```mermaid
+sequenceDiagram
+    participant User
+    participant JH as JupyterHub
+    participant KC as Keycloak
+    participant MinIO
+    participant NB as Notebook Pod
+    
+    User->>JH: Login
+    JH->>KC: OAuth Redirect
+    User->>KC: Authenticate
+    KC->>JH: ID Token
+    
+    User->>JH: Start Notebook
+    JH->>KC: Get Fresh ID Token
+    KC->>JH: ID Token (with groups)
+    JH->>MinIO: STS AssumeRoleWithWebIdentity
+    MinIO->>KC: Validate Token
+    KC->>MinIO: Valid + Groups
+    MinIO->>JH: Temp Credentials (1hr)
+    
+    JH->>NB: Spawn Pod with Env Vars
+    Note over NB: AWS_ACCESS_KEY_ID<br/>AWS_SECRET_ACCESS_KEY<br/>AWS_SESSION_TOKEN
+    
+    NB->>MinIO: S3 API Calls
+    MinIO->>NB: Data Access
 ```
 
-**Environment variables injected into notebooks:**
-- `AWS_ACCESS_KEY_ID` - Temporary access key
-- `AWS_SECRET_ACCESS_KEY` - Temporary secret key  
-- `AWS_SESSION_TOKEN` - Session token
-- `MINIO_ENDPOINT` - MinIO API endpoint
+### Spark → MinIO (S3A)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant SparkApp as SparkApplication
+    participant Driver as Spark Driver
+    participant Executor as Spark Executors
+    participant MinIO
+    
+    User->>SparkApp: Submit Job (YAML)
+    SparkApp->>Driver: Create Driver Pod
+    Driver->>Executor: Create Executor Pods
+    
+    Note over Driver,Executor: S3A Config:<br/>fs.s3a.endpoint<br/>fs.s3a.access.key<br/>fs.s3a.secret.key
+    
+    Driver->>MinIO: Read Data (S3A)
+    Executor->>MinIO: Read/Write Data
+    MinIO->>Executor: Data Transfer
+    Executor->>Driver: Results
+```
+
+### Dremio → MinIO (Data Source)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dremio as Dremio Coordinator
+    participant Exec as Dremio Executors
+    participant MinIO
+    
+    User->>Dremio: SQL Query
+    Dremio->>Dremio: Parse & Plan
+    Dremio->>Exec: Distribute Query
+    Exec->>MinIO: Read Data (S3)
+    MinIO->>Exec: Parquet/Iceberg Files
+    Exec->>Dremio: Results
+    Dremio->>User: Query Results
+```
 
 ---
 
 ## Namespace Layout
 
-| Namespace | Components | Purpose |
-|-----------|------------|---------|
-| `operators` | Keycloak, Keycloak Operator, PostgreSQL, Spark Operator | Core infrastructure operators |
-| `vault` | Vault | Secrets management |
-| `minio-operator` | MinIO Operator | MinIO lifecycle management |
-| `minio` | MinIO Tenant | Object storage |
-| `jupyterhub` | Hub, Proxy | JupyterHub control plane |
-| `jupyterhub-users` | User notebook pods | User workloads |
-| `dremio` | Dremio coordinators, executors | Query engine |
+```mermaid
+graph TB
+    subgraph operators["operators namespace"]
+        KC[Keycloak]
+        KCO[Keycloak Operator]
+        PG[PostgreSQL]
+        SparkOp[Spark Operator]
+    end
+    
+    subgraph vault["vault namespace"]
+        V[Vault]
+    end
+    
+    subgraph minio-operator["minio-operator namespace"]
+        MO[MinIO Operator]
+    end
+    
+    subgraph minio["minio namespace"]
+        MT[MinIO Tenant]
+    end
+    
+    subgraph jupyterhub["jupyterhub namespace"]
+        Hub[JupyterHub]
+        Proxy[Proxy]
+    end
+    
+    subgraph jupyterhub-users["jupyterhub-users namespace"]
+        NB1[User Notebooks]
+    end
+    
+    subgraph dremio["dremio namespace"]
+        Coord[Coordinator]
+        Exec[Executors]
+    end
+    
+    KCO -->|manages| KC
+    MO -->|manages| MT
+    SparkOp -->|manages| SparkApps[SparkApplications]
+    Hub -->|spawns| NB1
+```
 
 ---
 
@@ -199,13 +276,20 @@ This platform provides a complete data analytics environment on Kubernetes (GKE)
 
 ## Network Architecture
 
-### Internal Communication
-All services communicate within the cluster using Kubernetes DNS:
-- `keycloak-service.operators.svc.cluster.local:8080`
-- `vault.vault.svc.cluster.local:8200`
-- `minio.minio.svc.cluster.local:443`
+### Internal DNS
+
+```mermaid
+graph LR
+    subgraph Services
+        KC[keycloak-service.operators.svc.cluster.local:8080]
+        V[vault.vault.svc.cluster.local:8200]
+        M[minio.minio.svc.cluster.local:443]
+        D[dremio-client.dremio.svc.cluster.local:9047]
+    end
+```
 
 ### External Access (Port Forwards)
+
 | Service | Local Port | Remote Port | URL |
 |---------|------------|-------------|-----|
 | Keycloak | 8080 | 8080 | http://localhost:8080 |
@@ -217,32 +301,40 @@ All services communicate within the cluster using Kubernetes DNS:
 
 ---
 
-## Deployment Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `deploy-gke.sh` | Deploy Keycloak + Vault with OIDC integration |
-| `deploy-minio-gke.sh` | Deploy MinIO with OIDC + STS |
-| `deploy-jupyterhub-gke.sh` | Deploy JupyterHub with OAuth + MinIO STS |
-| `deploy-spark-operator.sh` | Deploy Spark Operator |
-| `deploy-dremio-ee.sh` | Deploy Dremio Enterprise |
-| `start-port-forwards.sh` | Start all port forwards |
-
----
-
 ## Security Model
 
-### Authentication
-- **Single Sign-On**: All services authenticate via Keycloak OIDC
-- **Token-based**: OIDC tokens validate user identity
-- **Session management**: Keycloak manages session lifecycle
+```mermaid
+graph TB
+    subgraph Authentication
+        SSO[Single Sign-On<br/>via Keycloak OIDC]
+        Token[Token-based<br/>JWT Validation]
+    end
+    
+    subgraph Authorization
+        Groups[Group-based<br/>Keycloak Groups]
+        Policies[Policy-based<br/>MinIO/Vault Policies]
+    end
+    
+    subgraph Secrets
+        Central[Centralized<br/>Vault Storage]
+        Dynamic[Dynamic<br/>STS Credentials]
+        Encrypt[Encrypted<br/>At Rest]
+    end
+    
+    SSO --> Token
+    Token --> Groups
+    Groups --> Policies
+    Central --> Dynamic
+    Dynamic --> Encrypt
+```
 
-### Authorization
-- **Group-based**: Access controlled by Keycloak group membership
-- **Policy-based**: MinIO and Vault use policies tied to groups
-- **Least privilege**: Users get minimum required permissions
+### Access Control Matrix
 
-### Secrets
-- **Centralized**: All secrets stored in Vault
-- **Dynamic**: STS provides time-limited credentials
-- **Encrypted**: Vault encrypts secrets at rest
+| Service | Auth Method | Authorization |
+|---------|-------------|---------------|
+| Keycloak | Username/Password | Realm roles |
+| Vault | OIDC or Token | Policies via groups |
+| MinIO | OIDC + STS | Policies via groups |
+| JupyterHub | OAuth | Group membership |
+| Spark | Service Account | K8s RBAC |
+| Dremio | OIDC or Local | Dremio roles |

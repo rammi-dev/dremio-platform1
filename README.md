@@ -1,137 +1,207 @@
-# Production Platform on GKE
+# Data Platform on GKE
 
-A production-ready data platform deployed on Google Kubernetes Engine (GKE), integrating **JupyterHub**, **MinIO**, **Keycloak**, and **Vault**.
-
-| Component | Purpose | Details |
-|-----------|---------|---------|
-| **JupyterHub** | Data Science Environment | Dynamic profiles (Small/Large/GPU), RBAC |
-| **MinIO** | Object Storage (S3) | High-performance, OIDC-integrated, Multi-tenant |
-| **Keycloak** | Identity & Access (IAM) | OIDC Provider, User Federation, RBAC |
-| **Vault** | Secret Management | Centralized secret storage, OIDC auth |
-
-## 🚀 Quick Start (GKE)
-
-### 1. Prerequisites
-- GKE Cluster (Standard or Autopilot)
-- `kubectl` configured for the cluster
-- `helm` installed
-- `jq` installed
-
-**Setup Cluster Context:**
-```bash
-gcloud container clusters get-credentials data-cluster-gke1 --zone europe-central2-b
-```
-
-### 2. Full Deployment
-Run the automated deployment scripts in order:
-
-```bash
-# 1. Deploy Core Infrastructure (Keycloak & Vault)
-./scripts/deploy-gke.sh
-
-# 2. Deploy MinIO (Object Storage)
-helm repo add minio-operator https://operator.min.io
-helm repo update
-
-# Install MinIO Operator
-helm install minio-operator minio-operator/operator \
-  -n minio-operator --create-namespace \
-  -f helm/minio/operator-values.yaml
-
-# Install MinIO Tenant
-helm install minio minio-operator/tenant \
-  -n minio --create-namespace \
-  -f helm/minio/tenant-values.yaml
-
-# 3. Deploy Dremio (optional)
-# First, add your Quay.io credentials to helm/dremio/.env
-./scripts/start-dremio.sh
-
-# 4. Deploy JupyterHub (optional)
-./scripts/deploy-jupyterhub-gke.sh
-```
-
-**📖 For detailed step-by-step instructions, see [DEPLOYMENT-GKE.md](DEPLOYMENT-GKE.md)**
-
-
-### 3. Access Services
-
-| Service | Local URL (after port-forward) | Default Creds |
-|---------|--------------------------------|---------------|
-| **JupyterHub** | http://localhost:8000 | Login via Keycloak |
-| **Keycloak** | http://localhost:8080 | `admin` / `admin` (Vault Realm) |
-| **MinIO Console** | http://localhost:9091 | Login via OIDC |
-| **Vault** | http://localhost:8200 | Token in `config/vault-keys.json` |
-
----
-
-## 🏗️ Architecture
+A production-ready data platform deployed on Google Kubernetes Engine (GKE) with centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
 
 ```mermaid
-graph TD
-    User[User] -->|OIDC Auth| KC[Keycloak]
-    User -->|Login| JH[JupyterHub]
-    
-    JH -->|Spawn| NB[Notebook Pod]
-    NB -->|Assume Role| STS[MinIO STS]
-    STS -->|Verify Token| KC
-    STS -->|Issue Creds| NB
-    
-    NB -->|S3 API| MinIO[MinIO Tenant]
-    KC -->|Policy Mapping| MinIO
+graph LR
+    subgraph Platform
+        KC[🔐 Keycloak] --> Vault[🔑 Vault]
+        KC --> MinIO[📦 MinIO]
+        KC --> JH[📓 JupyterHub]
+        KC --> Dremio[🔍 Dremio]
+        
+        JH -->|STS| MinIO
+        Spark[⚡ Spark] -->|S3A| MinIO
+        Dremio -->|S3| MinIO
+    end
 ```
 
-### Integration Flow
-1. **Authentication**: User logs into JupyterHub via Keycloak.
-2. **Identity**: Keycloak issues an ID Token with user groups (e.g., `data-science`).
-3. **Storage Access**: JupyterHub hooks exchange this ID Token for temporary **MinIO STS Credentials**.
-4. **Notebook**: The Notebook pod starts with `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `S3_ENDPOINT` injected.
-5. **Authorization**: MinIO applies policies based on Keycloak groups (e.g., `data-science` group -> `data-science` policy).
+## Components
+
+| Component | Purpose | Namespace |
+|-----------|---------|-----------|
+| **Keycloak** | Identity Provider (OIDC/OAuth) | `operators` |
+| **Vault** | Secrets Management | `vault` |
+| **MinIO** | S3-Compatible Object Storage | `minio` |
+| **JupyterHub** | Interactive Notebooks | `jupyterhub` |
+| **Spark Operator** | Distributed Computing | `operators` |
+| **Dremio** | SQL Analytics Engine | `dremio` |
 
 ---
 
-## 🔒 Configuration & RBAC
+## Quick Start
 
-### Keycloak (Declarative)
-Configuration is managed via the **Keycloak Realm CRD** (`helm/keycloak/manifests/keycloak-realm-import.yaml`).
-- **Users**: `admin`, `jupyter-admin`, `jupyter-ds`
-- **Groups**: `admin`, `data-science`, `vault-admins`
+### Prerequisites
 
-### MinIO Policies (Scripted)
-Policies are applied automatically by `deploy-minio-gke.sh`:
-- **data-science**: Full S3 access to all buckets.
-- **admin**: Full System Access.
+- GKE Cluster with `kubectl` configured
+- `helm` and `jq` installed
 
-### JupyterHub Profiles
-Machine profiles are dynamically available based on group membership:
-- **Small** (0.5 CPU, 1G RAM): Everyone
-- **Large** (2 CPU, 4G RAM): `data-science` group
-- **GPU** (4 CPU, 8G RAM): `gpu-users` group
+### Connect to Cluster
+
+```bash
+gcloud container clusters get-credentials <cluster-name> --zone <zone> --project <project>
+```
+
+### Deploy Platform
+
+```bash
+# 1. Core Infrastructure (Keycloak + Vault)
+./scripts/deploy-gke.sh
+
+# 2. Object Storage (MinIO)
+./scripts/deploy-minio-gke.sh
+
+# 3. Notebooks (JupyterHub)
+./scripts/deploy-jupyterhub-gke.sh
+
+# 4. Distributed Computing (Spark)
+./scripts/deploy-spark-operator.sh
+
+# 5. SQL Analytics (Dremio) - Optional
+./scripts/deploy-dremio-ee.sh
+```
+
+### Access Services
+
+```bash
+./scripts/start-port-forwards.sh
+```
+
+| Service | URL | Login |
+|---------|-----|-------|
+| Keycloak | http://localhost:8080 | `admin` / `admin` |
+| Vault | http://localhost:8200 | OIDC or Token |
+| MinIO | https://localhost:9091 | "Login with OpenID" |
+| JupyterHub | http://localhost:8000 | "Sign in with Keycloak" |
+| Dremio | http://localhost:9047 | (when deployed) |
 
 ---
 
-## 📂 Project Structure
+## Architecture
+
+```mermaid
+graph TB
+    User[👤 User] -->|OIDC| KC[Keycloak]
+    
+    KC -->|Auth| Vault
+    KC -->|Auth| MinIO
+    KC -->|OAuth| JH[JupyterHub]
+    KC -->|Auth| Dremio
+    
+    JH -->|STS Credentials| MinIO
+    Spark -->|S3A| MinIO
+    Dremio -->|S3| MinIO
+    
+    subgraph "Data Processing"
+        JH
+        Spark[Spark Jobs]
+        Dremio
+    end
+    
+    subgraph "Data Lake"
+        MinIO
+    end
+```
+
+### Authentication Flow
+
+1. **User** authenticates with **Keycloak** (OIDC)
+2. **Keycloak** issues ID Token with user groups
+3. **Services** validate tokens and apply group-based policies
+4. **MinIO STS** provides temporary S3 credentials
+
+### Data Flow
+
+- **JupyterHub**: Auto-injects MinIO STS credentials into notebooks
+- **Spark**: Uses S3A connector with MinIO credentials
+- **Dremio**: Queries data directly from MinIO buckets
+
+---
+
+## Project Structure
 
 ```
+├── docs/
+│   ├── ARCHITECTURE.md    # Detailed architecture diagrams
+│   ├── ACCESS.md          # Credentials and access control
+│   ├── DEPLOYMENT.md      # Step-by-step deployment guide
+│   ├── JUPYTERHUB.md      # JupyterHub OAuth configuration
+│   ├── MINIO_STS.md       # MinIO STS credentials guide
+│   └── VAULT_OIDC.md      # Vault OIDC login guide
 ├── helm/
-│   ├── jupyterhub/    # JupyterHub Chart & Values
-│   ├── keycloak/      # Keycloak Operator & Manifests
-│   ├── minio/         # MinIO Operator & Tenant Config
-│   └── vault/         # Vault Helm Config
+│   ├── keycloak/          # Keycloak operator & manifests
+│   ├── vault/             # Vault Helm values
+│   ├── minio/             # MinIO operator & tenant config
+│   ├── jupyterhub/        # JupyterHub Helm values
+│   ├── spark/             # Spark operator chart
+│   └── dremio/            # Dremio Helm chart
 ├── scripts/
-│   ├── deploy-gke.sh              # Core Deployment
-│   ├── deploy-minio-gke.sh        # MinIO Deployment
-│   ├── deploy-jupyterhub-gke.sh   # JupyterHub Deployment
-│   └── lib/                       # Shared Bash Functions
-└── README-MINIKUBE.md             # Local Development Guide
+│   ├── deploy-gke.sh              # Deploy Keycloak + Vault
+│   ├── deploy-minio-gke.sh        # Deploy MinIO
+│   ├── deploy-jupyterhub-gke.sh   # Deploy JupyterHub
+│   ├── deploy-spark-operator.sh   # Deploy Spark Operator
+│   ├── deploy-dremio-ee.sh        # Deploy Dremio
+│   ├── start-port-forwards.sh     # Start all port forwards
+│   ├── show-access-info.sh        # Display credentials
+│   ├── list-users.sh              # List Keycloak users
+│   └── cleanup-dremio-namespace.sh # Clean stuck namespaces
+└── config/                # Generated credentials (gitignored)
 ```
 
-## 🛠️ Local Development
+---
 
-For deployment on **Minikube**, please refer to:
-👉 **[README-MINIKUBE.md](README-MINIKUBE.md)**
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Component details, data flows, Mermaid diagrams |
+| [ACCESS.md](docs/ACCESS.md) | All credentials, auth methods, policies |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Complete GKE deployment guide |
+| [JUPYTERHUB.md](docs/JUPYTERHUB.md) | JupyterHub OAuth configuration |
+| [MINIO_STS.md](docs/MINIO_STS.md) | MinIO STS credential generation |
+| [VAULT_OIDC.md](docs/VAULT_OIDC.md) | Vault OIDC login troubleshooting |
+
+---
+
+## Scripts Reference
+
+| Script | Purpose |
+|--------|---------|
+| `deploy-gke.sh` | Deploy Keycloak + Vault with OIDC |
+| `deploy-minio-gke.sh` | Deploy MinIO with OIDC + STS |
+| `deploy-jupyterhub-gke.sh` | Deploy JupyterHub with OAuth |
+| `deploy-spark-operator.sh` | Deploy Spark Operator |
+| `deploy-dremio-ee.sh` | Deploy Dremio Enterprise |
+| `start-port-forwards.sh` | Start all port forwards |
+| `show-access-info.sh` | Display all credentials |
+| `list-users.sh` | List Keycloak users |
+| `list-policies.sh` | List MinIO policies |
+| `get-minio-sts-credentials.sh` | Get MinIO STS tokens |
+| `cleanup-dremio-namespace.sh` | Clean stuck namespaces |
+
+---
+
+## Quick Commands
+
+```bash
+# Get all credentials
+./scripts/show-access-info.sh
+
+# Start port forwards
+./scripts/start-port-forwards.sh
+
+# List users
+./scripts/list-users.sh
+
+# Get MinIO STS credentials
+./scripts/get-minio-sts-credentials.sh
+
+# Check pods
+kubectl get pods -A | grep -E '^(operators|vault|minio|jupyterhub|dremio)'
+```
 
 ---
 
 ## License
+
 Reference implementation for Data Platform deployment.
