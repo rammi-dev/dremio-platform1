@@ -20,6 +20,8 @@ tenant:
   buckets:
     - name: default-bucket
     - name: user-data
+    - name: dremio  # For Dremio distributed storage (metadata, reflections, backups)
+    - name: dremio-catalog  # For Dremio Open Catalog (Polaris) - Iceberg tables
 
   
   configSecret:

@@ -1,0 +1,168 @@
+# Overrides for Dremio Helm Chart (Direct Deployment)
+# POC configuration with minimal resources and single-node components
+
+# Enable dev mode to allow single-node MongoDB
+devMode: true
+
+# Global image pull secrets (string array format for schema)
+imagePullSecrets:
+  - dremio-quay-secret
+
+# Dremio application
+image:
+  repository: quay.io/dremio/dremio-ee
+  tag: "26.1"
+
+# Coordinator - minimal resources
+# Minimum memory is 4Gi for Java heap + overhead
+coordinator:
+  count: 1
+  cpu: 1
+  memory: 4Gi
+  affinity: {}  # Disable anti-affinity for single-node
+  resources:
+    requests:
+      cpu: "500m" 
+      memory: "4Gi"
+    limits:
+      cpu: "2"
+      memory: "8Gi"
+  log:
+    volume:
+      size: 10Gi
+  volumeSize: 10Gi
+  web:
+    auth:
+      type: "internal"
+
+# Executor - disabled (using engines instead)
+executor:
+  count: 0
+
+# Engines - minimal configuration
+engines:
+  - name: default-engine
+    count: 1
+    cpu: 1
+    memory: 4Gi # 1G minimal
+    volumeSize: 10Gi
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "2Gi"
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+
+# Catalog - Internal Polaris only at minimal scale
+catalog:
+  replicas: 1
+  externalAccess:
+    enabled: false
+    replicas: 0
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+# Catalog Services
+catalogServices:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+# MongoDB - Single node
+mongodb:
+  replicaCount: 1
+  unsafeFlags:
+    replsetSize: true
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  storage:
+    resources:
+      requests:
+        storage: 10Gi
+
+# MongoDB Operator
+mongodbOperator:
+  imagePullSecrets:
+    - name: dremio-quay-secret
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+# OpenSearch - Disabled for POC (was causing OOMKilled)
+opensearch:
+  enabled: false
+
+# OpenSearch Operator
+opensearchOperator:
+  imagePullSecrets:
+    - name: dremio-quay-secret
+
+# Zookeeper - Minimal
+zookeeper:
+  count: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# NATS - Minimal
+nats:
+  cluster:
+    replicas: 1  # Reduce NATS to 1 replica if possible for POC
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# Telemetry
+telemetry:
+  enabled: false
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+# Distributed storage (MinIO)
+distStorage:
+  type: "aws"
+  aws:
+    bucketName: "dremio"
+    path: "/"
+    region: "us-east-1"
+    endpoint: "minio.minio.svc.cluster.local:443"
+    tls: true
+    authentication: "accessKeySecret"
+    credentials:
+      accessKey: ""
+      secret: ""
+
+extraStartParams: "-Dfs.s3a.path.style.access=true -Dfs.s3a.connection.ssl.enabled=true"

@@ -1,0 +1,6405 @@
+---
+# Source: dremio-enterprise/charts/dremio/charts/nats/templates/pod-disruption-budget.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/version: 2.11.0
+    helm.sh/chart: nats-1.3.1
+  name: dremio-nats
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nats
+      app.kubernetes.io/instance: dremio
+      app.kubernetes.io/name: nats
+---
+# Source: dremio-enterprise/charts/dremio/templates/zookeeper.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zk-pdb
+spec:
+  selector:
+    matchLabels:
+      app: zk
+  maxUnavailable: 1
+---
+# Source: dremio-enterprise/charts/dremio-mongodb-operator-helm/templates/role-binding.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-dremio-mongodb-operator-helm
+  namespace: dremio
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-catalog-server
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-services-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-catalog-services
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-cluster-id.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-cluster-id
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-coordinator-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-coordinator
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: engine-operator
+  name: dremio-engine-operator
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: engine-executor
+  name: dremio-engine-executor
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-telemetry.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+## Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: telemetry-collector
+  name: telemetry-collector
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb-operator-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-mongodb-operator
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-mongodb
+  namespace: dremio
+---
+# Source: dremio-enterprise/charts/dremio/templates/nats-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-nats
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch-cluster-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opensearch-cluster
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch-operator-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-opensearch-operator
+---
+# Source: dremio-enterprise/charts/dremio/templates/zookeeper-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zookeeper
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-license-secret.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dremio-license
+type: Opaque
+stringData:
+  license: ""
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb-backup.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dremio-mongodb-backup
+  namespace: dremio
+type: Opaque
+data:
+  AWS_ACCESS_KEY_ID: "dGVzdA=="
+  AWS_SECRET_ACCESS_KEY: "dGVzdA=="
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dremio-mongodb-app-users
+  namespace: dremio
+  annotations:
+    helm.sh/resource-policy: keep
+type: Opaque
+stringData:
+  dremio: "tztguI2g66dVb0zOoEbBnukdbBrSjeuc"
+---
+# Source: dremio-enterprise/charts/dremio/charts/nats/templates/config-map.yaml
+apiVersion: v1
+data:
+  nats.conf: |
+    {
+      "cluster": {
+        "name": "dremio-nats",
+        "no_advertise": true,
+        "port": 6222,
+        "routes": [
+          "nats://dremio-nats-0.dremio-nats-headless:6222",
+          "nats://dremio-nats-1.dremio-nats-headless:6222",
+          "nats://dremio-nats-2.dremio-nats-headless:6222"
+        ]
+      },
+      "http_port": 8222,
+      "jetstream": {
+        "max_file_store": 2Gi,
+        "max_memory_store": 0,
+        "store_dir": "/data"
+      },
+      "lame_duck_duration": "30s",
+      "lame_duck_grace_period": "10s",
+      "pid_file": "/var/run/nats/nats.pid",
+      "port": 4222,
+      "server_name": $SERVER_NAME
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/version: 2.11.0
+    helm.sh/chart: nats-1.3.1
+  name: dremio-nats-config
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-manager-config-cm.yaml
+apiVersion: v1
+data:
+  controller_manager_config.yaml: |
+    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
+    kind: ControllerManagerConfig
+    health:
+      healthProbeBindAddress: :8081
+    metrics:
+      bindAddress: 127.0.0.1:8080
+    webhook:
+      port: 9443
+    leaderElection:
+      leaderElect: true
+      resourceName: a867c7dc.opensearch.dremio.io
+kind: ConfigMap
+metadata:
+  name: dremio-os-operator-manager-config
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-cluster-id.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dremio-cluster-id
+# data is intentionally omitted
+# The cluster_id is populated after the coordinator starts by the Job below
+# Upgrades won't wipe out the contents unless --force is used. However, the job below will heal it
+# The resource will be deleted on uninstall
+# These resources add the cluster_id to the ConfigMap above
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-configmap.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dremio-config
+data:
+  core-site.xml: |
+    <?xml version="1.0"?>
+    <!--
+    
+        Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    
+    -->
+    <configuration>
+      <!-- If you are editing any content in this file, please remove lines with double curly braces around them -->
+      <!-- S3 Configuration Section -->
+      <property>
+        <name>fs.dremioS3.impl</name>
+        <description>The FileSystem implementation. Must be set to com.dremio.plugins.s3.store.S3FileSystem</description>
+        <value>com.dremio.plugins.s3.store.S3FileSystem</value>
+      </property>
+      <property>
+        <name>fs.s3a.aws.credentials.provider</name>
+        <description>The credential provider type.</description>
+        <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider</value>
+      </property>
+      <property>
+        <name>fs.s3a.access.key</name>
+        <description>AWS access key ID.</description>
+        <value>test</value>
+      </property>
+      <property>
+        <name>fs.s3a.secret.key</name>
+        <description>AWS secret key.</description>
+        <value>test</value>
+      </property>
+      
+    </configuration>
+    
+  dremio-env: |
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    #
+    # Dremio environment variables used by Dremio daemon
+    #
+    
+    #
+    # Directory where Dremio logs are written
+    # Default to $DREMIO_HOME/log
+    #
+    #DREMIO_LOG_DIR=${DREMIO_HOME}/log
+    
+    #
+    # Send logs to console and not to log files. The DREMIO_LOG_DIR is ignored if set.
+    #
+    #DREMIO_LOG_TO_CONSOLE=1
+    
+    #
+    # Directory where Dremio pidfiles are written
+    # Default to $DREMIO_HOME/run
+    #
+    #DREMIO_PID_DIR=${DREMIO_HOME}/run
+    
+    #
+    # Max total memory size (in MB) for the Dremio process
+    #
+    # If not set, default to using max heap and max direct.
+    #
+    # If both max heap and max direct are set, this is not used
+    # If one is set, the other is calculated as difference
+    # of max memory and the one that is set.
+    #
+    #DREMIO_MAX_MEMORY_SIZE_MB=
+    
+    #
+    # Max heap memory size (in MB) for the Dremio process
+    #
+    # Default to 4096 for server
+    #
+    #DREMIO_MAX_HEAP_MEMORY_SIZE_MB=4096
+    
+    #
+    # Max direct memory size (in MB) for the Dremio process
+    #
+    # Default to 8192 for server
+    #
+    #DREMIO_MAX_DIRECT_MEMORY_SIZE_MB=8192
+    
+    #
+    # Max permanent generation memory size (in MB) for the Dremio process
+    # (Only used for Java 7)
+    #
+    # Default to 512 for server
+    #
+    #DREMIO_MAX_PERMGEN_MEMORY_SIZE_MB=512
+    
+    #
+    # Garbage collection logging is enabled by default. Set the following
+    # parameter to "no" to disable garbage collection logging.
+    #
+    #DREMIO_GC_LOGS_ENABLED="yes"
+    
+    #
+    # The scheduling priority for the server
+    #
+    # Default to 0
+    #
+    # DREMIO_NICENESS=0
+    #
+    
+    #
+    # Number of seconds after which the server is killed forcibly it it hasn't stopped
+    #
+    # Default to 120
+    #
+    #DREMIO_STOP_TIMEOUT=120
+    
+    # Extra Java options - shared between dremio and dremio-admin commands
+    #
+    #DREMIO_JAVA_EXTRA_OPTS=
+    
+    # Extra Java options - client only (dremio-admin command)
+    #
+    #DREMIO_JAVA_CLIENT_EXTRA_OPTS=
+    
+    # Warning: Do not set DREMIO_JAVA_SERVER_EXTRA_OPTS in dremio-env.
+    # Please see the values.yaml extraStartParams for setting additional options for Dremio process startup.
+    
+  dremio.conf: |
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    paths: {
+      # Local path for dremio to store data.
+      local: ${DREMIO_HOME}"/data"
+      # Distributed path Dremio data including job results, downloads,
+      # uploads, etc
+      results: "pdfs://"${paths.local}"/results"
+      dist: "dremioS3:///dremio/"
+    }
+    
+    services: {
+      # The services running are controlled via command line options passed in
+      # while starting the services via kubernetes. Updating the values listed below will not
+      # impact what is running:
+      # - coordinator.enabled
+      # - coordinator.master.enabled
+      # - coordinator.master.embedded-zookeeper.enabled
+      # - executor.enabled
+      #
+      # Other service parameters can be customized via this file.
+    
+      # Enable prometheus metrics for dremio if phone home is enabled
+      web-admin: {
+        enabled: true
+        host: "0.0.0.0"
+        port: 9010
+      }
+      executor: {
+        cache: {
+          path.db: "/opt/dremio/cloudcache/c0"
+          pctquota.db: 100
+    
+          path.fs: ["/opt/dremio/cloudcache/c0"]
+          pctquota.fs: [70]
+          ensurefreespace.fs: [10]
+          
+        }
+      }
+    }
+    debug: {
+      # Enable caching for distributed storage, it is turned off by default
+      dist.caching.enabled: true,
+      # Max percent of total available cache space to use when possible for distributed storage
+      dist.max.cache.space.percent: 100
+    }
+    services.coordinator.web.auth.type: "internal"
+    
+    
+    
+    
+    
+  logback-access.xml: |
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <!--
+    
+        Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    
+    -->
+    <configuration>
+    
+      <!-- The following appender is only available if dremio.log.path is defined -->
+      <if condition='isDefined("dremio.log.path")'>
+        <then>
+          <appender name="access-text" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/access.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/access.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder>
+              <pattern>combined</pattern>
+            </encoder>
+          </appender>
+    
+          <appender-ref ref="access-text" />
+        </then>
+        <else>
+          <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+              <pattern>combined</pattern>
+            </encoder>
+          </appender>
+    
+          <appender-ref ref="console"/>
+        </else>
+      </if>
+    </configuration>
+    
+  logback-admin.xml: |
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <!--
+    
+        Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    
+    -->
+    <configuration>
+      <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+          <pattern>%msg%n%ex{0}%n</pattern>
+        </encoder>
+      </appender>
+    
+    
+      <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+          <level>${dremio.admin.log.verbosity:-OFF}</level>
+        </filter>
+        <encoder>
+          <pattern>%date{ISO8601} [%thread] %-5level %logger{30} - %msg%n</pattern>
+        </encoder>
+      </appender>
+    
+    
+      <if condition='isDefined("dremio.admin.log.path")'>
+        <then>
+          <appender name="ADMINLOG" class="ch.qos.logback.core.FileAppender">
+            <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+              <level>${dremio.admin.log.verbosity:-OFF}</level>
+            </filter>
+            <file>${dremio.admin.log.path}</file>
+            <encoder>
+              <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+          </appender>
+        </then>
+      </if>
+    
+      <logger name="admin" level="INFO" additivity="true">
+        <appender-ref ref="STDOUT"/>
+      </logger>
+    
+      <root>
+        <level value="${dremio.admin.log.verbosity:-OFF}"/>
+        <if condition='isDefined("dremio.admin.log.path")'>
+          <then>
+            <appender-ref ref="ADMINLOG"/>
+          </then>
+          <else>
+            <appender-ref ref="CONSOLE"/>
+          </else>
+        </if>
+      </root>
+    
+    </configuration>
+    
+  logback.xml: |
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <!--
+    
+        Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    
+    -->
+    <configuration scan="true" scanPeriod="30 seconds">
+      <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator"/>
+      <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+          <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+      </appender>
+    
+      <!-- The following appenders are only available if dremio.log.path is defined -->
+      <if condition='isDefined("dremio.log.path")'>
+        <then>
+          <appender name="text" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/server.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/server.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder>
+              <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+          </appender>
+    
+          <appender name="metadata_refresh" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/metadata_refresh.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/metadata_refresh.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+            </rollingPolicy>
+    
+            <encoder>
+              <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+          </appender>
+    
+          <appender name="json" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/json/server.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/json/archive/server.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+              <providers>
+                <pattern><pattern>{"timestamp": "%date{ISO8601}", "host":"${HOSTNAME}" }</pattern></pattern>
+                <threadName><fieldName>thread</fieldName></threadName>
+                <logLevel><fieldName>levelName</fieldName></logLevel>
+                <logLevelValue><fieldName>levelValue</fieldName></logLevelValue>
+                <loggerName><fieldName>logger</fieldName></loggerName>
+                <message><fieldName>message</fieldName></message>
+                <arguments />
+                <stackTrace />
+              </providers>
+            </encoder>
+          </appender>
+    
+          <appender name="query" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/queries.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/queries.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+              <providers>
+                <arguments />
+              </providers>
+            </encoder>
+          </appender>
+    
+          <appender name="search" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/search.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/search.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+              <providers>
+                <arguments />
+              </providers>
+            </encoder>
+          </appender>
+    
+          <appender name="audit" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/audit.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/audit.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+              <providers>
+                <pattern><pattern>{"timestamp": "%date{ISO8601}"}</pattern></pattern>
+                <arguments />
+              </providers>
+            </encoder>
+          </appender>
+    
+          <appender name="tracker" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/tracker.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/tracker.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                  <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder>
+              <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+          </appender>
+    
+          <appender name="vacuum" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${dremio.log.path}/vacuum.json</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+              <fileNamePattern>${dremio.log.path}/archive/vacuum.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+              <maxHistory>30</maxHistory>
+              <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>100MB</maxFileSize>
+              </timeBasedFileNamingAndTriggeringPolicy>
+            </rollingPolicy>
+    
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+              <providers>
+                <pattern><pattern>{"timestamp": "%date{ISO8601}"}</pattern></pattern>
+                <arguments />
+              </providers>
+            </encoder>
+          </appender>
+    
+        </then>
+      </if>
+    
+      <logger name="com.dremio">
+        <level value="${dremio.log.level:-info}"/>
+      </logger>
+    
+      <logger name="query.logger">
+        <level value="${dremio.log.level:-info}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="query"/>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="search.logger" additivity="false">
+        <level value="${dremio.log.level:-info}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="search"/>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="audit.logger">
+        <level value="${dremio.log.level:-info}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="audit"/>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="tracker.logger">
+          <level value="{dremio.log.level: -info}"/>
+          <if condition='isDefined("dremio.log.path")'>
+              <then>
+                  <additivity value ="false"/>
+                  <appender-ref ref="tracker"/>
+              </then>
+          </if>
+      </logger>
+    
+      <logger name="com.dremio.exec.catalog.SourceMetadataManager" additivity="false">
+        <level value="${dremio.log.level:-info}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="metadata_refresh"/>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="com.dremio.exec.store.hive.HiveClient" additivity="false">
+        <level value="${dremio.log.level:-info}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="metadata_refresh"/>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="VacuumLogger" additivity="false">
+        <level value="${dremio.log.level:-info}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="vacuum"/>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="hive.deprecated.function.warning.logger" level="warn">
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <additivity value ="false"/>
+            <appender name="text" class="ch.qos.logback.core.rolling.RollingFileAppender">
+              <file>${dremio.log.path}/hive.deprecated.function.warning.log</file>
+              <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>${dremio.log.path}/archive/hive.deprecated.function.warning.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxHistory>30</maxHistory>
+                <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                  <maxFileSize>100MB</maxFileSize>
+                </timeBasedFileNamingAndTriggeringPolicy>
+              </rollingPolicy>
+    
+              <encoder>
+                <pattern>%date{ISO8601} [%thread] %-5level %logger{36} - %msg%n</pattern>
+              </encoder>
+            </appender>
+          </then>
+        </if>
+      </logger>
+    
+      <logger name="org.apache.hadoop.hdfs.DFSClient">
+        <level value="warn"/>
+      </logger>
+    
+      <root>
+        <level value="${dremio.log.root.level:-error}"/>
+        <if condition='isDefined("dremio.log.path")'>
+          <then>
+            <appender-ref ref="text"/>
+            <appender-ref ref="json"/>
+            <appender-ref ref="console"/>
+          </then>
+          <else>
+            <appender-ref ref="console"/>
+          </else>
+        </if>
+      </root>
+    
+    </configuration>
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dremio-hive2-config
+data:
+  README.md: |
+    ### Hive 2 Configuration Files
+    This directory is used to store Hive 2 configuration files to be deployed to Dremio.
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dremio-hive3-config
+data:
+  README.md: |
+    ### Hive 3 Configuration Files
+    This directory is used to store Hive 3 configuration files to be deployed to Dremio.
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: executor-statefulset-template
+data:
+  executor-statefulset-template.yaml: |
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: template-dremio-executor
+    spec:
+      serviceName: "dremio-cluster-pod"
+      replicas: 0
+      podManagementPolicy: "Parallel"
+      revisionHistoryLimit: 1
+      selector:
+        matchLabels:
+          app: dremio-executor
+      template:
+        metadata:
+          labels:
+            role: dremio-cluster-pod
+            diagnostics-collector-role: dremio-executor
+          annotations:
+            metrics.dremio.com/scrape: "true"
+            metrics.dremio.com/port: "9010"
+            metrics.dremio.com/path: "/metrics"
+        spec:
+          terminationGracePeriodSeconds: 10
+          serviceAccountName: dremio-engine-executor
+          
+          securityContext:
+            fsGroup: 999
+            fsGroupChangePolicy: OnRootMismatch
+          containers:
+            - name: dremio-executor
+              
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                  - ALL
+                privileged: false
+                readOnlyRootFilesystem: false
+                runAsGroup: 999
+                runAsNonRoot: true
+                runAsUser: 999
+                seccompProfile:
+                  type: RuntimeDefault
+              image: quay.io/dremio/dremio-enterprise:26.1.1
+              imagePullPolicy: IfNotPresent
+              resources:
+                requests:
+                  cpu: 0
+                  memory: "0Gi"
+                limits:
+                  cpu: 0
+                  memory: "0Gi"
+              volumeMounts:
+                - name: dremio-log-volume
+                  mountPath: /opt/dremio/data/log
+                - name: dremio-config
+                  mountPath: /opt/dremio/conf
+                - name: dremio-engine-config
+                  mountPath: /opt/dremio/conf/engine
+                - name: dremio-hive2-config
+                  mountPath: /opt/dremio/plugins/connectors/hive2.d
+                - name: dremio-hive2-config
+                  mountPath: /opt/dremio/plugins/connectors/hive2-ee.d
+                - name: dremio-hive3-config
+                  mountPath: /opt/dremio/plugins/connectors/hive3.d
+                - name: dremio-hive3-config
+                  mountPath: /opt/dremio/plugins/connectors/hive3-ee.d
+                - name: dremio-default-executor-volume
+                  mountPath: /opt/dremio/data
+                - name: dremio-license
+                  mountPath: /opt/dremio/license
+                - name: dremio-default-executor-c3-0
+                  mountPath: /opt/dremio/cloudcache/c0
+              env:
+                - name: DREMIO_MAX_MEMORY_SIZE_MB
+                  value: "0"
+                - name: DREMIO_JAVA_SERVER_EXTRA_OPTS
+                  value: >-
+                    -XX:+UseG1GC
+                    -XX:+AlwaysPreTouch
+                    -XX:HeapDumpPath=/opt/dremio/data
+                    -XX:ErrorFile=/opt/dremio/data/hs_err_pid%p.log
+                    -XX:MaxGCPauseMillis=500
+                    -XX:InitiatingHeapOccupancyPercent=25
+                    -Xlog:gc*,classhisto*=trace:file=/opt/dremio/data/log/gc.log:uptime,time,tags,level:filecount=1,filesize=4M
+                    -Dzookeeper=zk-hs:2181
+                    -Dservices.coordinator.enabled=false
+                    -Dservices.coordinator.master.enabled=false
+                    -Dservices.coordinator.master.embedded-zookeeper.enabled=false
+                    -Dservices.executor.enabled=true
+                    -Dservices.conduit.port=45679
+                    -Ddremio.debug.sysopt.dremio.catalog.enabled=true
+                    -Dservices.dremio.catalog.uri=dremio-catalog-server
+                    -Dservices.dremio.catalog.port=9181
+                    -Dservices.dremio.catalog.grpc.uri=dremio-catalog-server-grpc
+                    -Dservices.dremio.catalog.grpc.port=9000
+                    -Dservices.dremiocatalog.services-uri=dremio-catalog-services-server
+                    -Dservices.dremiocatalog.services-port=9000
+                - name: DREMIO_LOG_TO_CONSOLE
+                  value: "0"
+                - name: DREMIO_LOG_DIR
+                  value: "/opt/dremio/data/log"
+                - name: DREMIO_HELM_VERSION
+                  value: "3.2.1"
+                
+              command: [ "/opt/dremio/bin/dremio" ]
+              args: [ "start-fg" ]
+              ports:
+                - containerPort: 45678
+                  name: server-fabric
+                - containerPort: 45679
+                  name: server-conduit
+                - containerPort: 9010
+                  name: metrics
+              startupProbe:
+                httpGet:
+                  path: /live
+                  port: 9010
+                initialDelaySeconds: 10
+                failureThreshold: 36
+                periodSeconds: 5
+              livenessProbe:
+                httpGet:
+                  path: /live
+                  port: 9010
+                failureThreshold: 30
+                periodSeconds: 10
+          initContainers:
+          
+          - name: wait-for-zookeeper
+            
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - ALL
+              privileged: false
+              readOnlyRootFilesystem: false
+              runAsGroup: 999
+              runAsNonRoot: true
+              runAsUser: 999
+              seccompProfile:
+                type: RuntimeDefault
+            image: quay.io/dremio/busybox:1.37.0-glibc
+            imagePullPolicy: IfNotPresent
+            command: [ "sh", "-c", "until nc zk-hs 2181 -w1 > /dev/null; do echo Waiting for Zookeeper to be ready.; sleep 2; done;" ]
+            resources:
+              limits:
+                cpu: 2000m
+                memory: 512Mi
+              requests:
+                cpu: 10m
+                memory: 10Mi
+          volumes:
+            
+            
+            - name: dremio-config
+              configMap:
+                name: dremio-config
+            - name: dremio-engine-config
+              configMap:
+                name: engine-options
+            - name: dremio-hive2-config
+              configMap:
+                name: dremio-hive2-config
+            - name: dremio-hive3-config
+              configMap:
+                name: dremio-hive3-config
+            - name: dremio-license
+              secret:
+                secretName: dremio-license
+                items:
+                  - key: license
+                    path: key
+      volumeClaimTemplates:
+        
+        - metadata:
+            name: dremio-default-executor-volume
+          spec:
+            accessModes: [ "ReadWriteOnce" ]
+            resources:
+              requests:
+                storage: 0Gi
+        
+        - metadata:
+            name: dremio-default-executor-c3-0
+          spec:
+            accessModes: [ "ReadWriteOnce" ]
+            resources:
+              requests:
+                storage: 0Gi
+        - metadata:
+            name: dremio-log-volume
+          spec:
+            accessModes: [ "ReadWriteOnce" ]
+            
+            resources:
+              requests:
+                storage: 10Gi
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: engine-options
+data:
+  engine-options.yaml: |
+    engineOptions:
+      idleTimeouts:
+        defaultDuration: PT15M
+        durations:
+        - PT2H
+        - PT1H30M
+        - PT1H
+        - PT30M
+        - PT15M
+        - PT10M
+        - PT5M
+        maximumDuration: PT12H
+      resourceAllocationOffsets:
+        defaultOffset: reserve-2-8
+        offsets:
+        - action: Reserve
+          cpu: 0
+          memory: 0Gi
+          name: reserve-0-0
+        - action: Reserve
+          cpu: 2
+          memory: 4Gi
+          name: reserve-2-4
+        - action: Reserve
+          cpu: 2
+          memory: 8Gi
+          name: reserve-2-8
+        - action: Reserve
+          cpu: 2
+          memory: 16Gi
+          name: reserve-2-16
+      sizes:
+      - cpuScaleFactor: 0.5
+        memory: 64Gi
+        name: 2XSmall
+        pods: 1
+      - memory: 128Gi
+        name: XSmall
+        pods: 1
+      - memory: 128Gi
+        name: Small
+        pods: 2
+      - memory: 128Gi
+        name: Medium
+        pods: 4
+      - memory: 128Gi
+        name: Large
+        pods: 8
+      - memory: 128Gi
+        name: XLarge
+        pods: 12
+      - memory: 128Gi
+        name: 2XLarge
+        pods: 16
+      - memory: 128Gi
+        name: 3XLarge
+        pods: 24
+      - memory: 128Gi
+        name: 4XLarge
+        pods: 32
+      storage:
+        c3StorageSizes:
+        - name: 100GB
+          storage: 100Gi
+        - name: 250GB
+          storage: 250Gi
+        - name: 500GB
+          storage: 500Gi
+        defaultC3StorageSize: 100GB
+        defaultSpillStorageSize: 100GB
+        spillStorageSizes:
+        - name: 100GB
+          storage: 100Gi
+        - name: 250GB
+          storage: 250Gi
+        - name: 500GB
+          storage: 500Gi
+      targetCpuCapacities:
+        capacities:
+        - cpu: 16
+          name: 16C
+        - cpu: 32
+          name: 32C
+        defaultCapacity: 32C
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-telemetry-configmap.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dremio-telemetry-config
+data:
+  config.yaml: |
+    
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    
+      bearertokenauth:
+        filename: "/var/opt/dremio/license"
+    
+    receivers:
+      k8s_cluster:
+        allocatable_types_to_report: [cpu, memory]
+        collection_interval: 5m
+        namespace: ${env:NAMESPACE_ID}
+        
+        metrics:
+          k8s.container.cpu_request:
+            enabled: true
+          k8s.container.cpu_limit:
+            enabled: false
+          k8s.container.memory_request:
+            enabled: true
+          k8s.container.memory_limit:
+            enabled: false
+          k8s.container.storage_request:
+            enabled: true
+          k8s.container.storage_limit:
+            enabled: false
+          k8s.container.ephemeralstorage_request:
+            enabled: false
+          k8s.container.ephemeralstorage_limit:
+            enabled: false
+          k8s.container.restarts:
+            enabled: true
+          k8s.container.ready:
+            enabled: true
+          k8s.pod.phase:
+            enabled: false
+          k8s.pod.status_reason:
+            enabled: false
+          k8s.deployment.desired:
+            enabled: false
+          k8s.deployment.available:
+            enabled: false
+          k8s.cronjob.active_jobs:
+            enabled: false
+          k8s.daemonset.current_scheduled_nodes:
+            enabled: false
+          k8s.daemonset.desired_scheduled_nodes:
+            enabled: false
+          k8s.daemonset.misscheduled_nodes:
+            enabled: false
+          k8s.daemonset.ready_nodes:
+            enabled: false
+          k8s.hpa.max_replicas:
+            enabled: false
+          k8s.hpa.min_replicas:
+            enabled: false
+          k8s.hpa.current_replicas:
+            enabled: true
+          k8s.hpa.desired_replicas:
+            enabled: true
+          k8s.job.active_pods:
+            enabled: false
+          k8s.job.desired_successful_pods:
+            enabled: false
+          k8s.job.failed_pods:
+            enabled: false
+          k8s.job.max_parallel_pods:
+            enabled: false
+          k8s.job.successful_pods:
+            enabled: false
+          k8s.namespace.phase:
+            enabled: false
+          k8s.replicaset.desired:
+            enabled: false
+          k8s.replicaset.available:
+            enabled: false
+          k8s.replication_controller.desired:
+            enabled: false
+          k8s.replication_controller.available:
+            enabled: false
+          k8s.resource_quota.hard_limit:
+            enabled: false
+          k8s.resource_quota.used:
+            enabled: false
+          k8s.statefulset.desired_pods:
+            enabled: true
+          k8s.statefulset.ready_pods:
+            enabled: false
+          k8s.statefulset.current_pods:
+            enabled: true
+          k8s.statefulset.updated_pods:
+            enabled: false
+          openshift.clusterquota.limit:
+            enabled: false
+          openshift.clusterquota.used:
+            enabled: false
+          openshift.appliedclusterquota.limit:
+            enabled: false
+          openshift.appliedclusterquota.used:
+            enabled: false
+          k8s.node.condition:
+            enabled: false
+    
+        resource_attributes:
+          k8s.namespace.uid:
+            enabled: false
+          k8s.namespace.name:
+            enabled: true
+          k8s.node.uid:
+            enabled: false
+          k8s.node.name:
+            enabled: true
+          container.id:
+            enabled: false
+          container.image.name:
+            enabled: false
+          container.image.tag:
+            enabled: false
+          k8s.container.name:
+            enabled: true
+          k8s.pod.name:
+            enabled: true
+          k8s.pod.uid:
+            enabled: true
+          k8s.pod.qos_class:
+            enabled: false
+          k8s.replicaset.name:
+            enabled: true
+          k8s.replicaset.uid:
+            enabled: false
+          k8s.replicationcontroller.name:
+            enabled: false
+          k8s.replicationcontroller.uid:
+            enabled: false
+          k8s.resourcequota.uid:
+            enabled: false
+          k8s.resourcequota.name:
+            enabled: false
+          k8s.statefulset.uid:
+            enabled: false
+          k8s.statefulset.name:
+            enabled: true
+          k8s.deployment.uid:
+            enabled: false
+          k8s.deployment.name:
+            enabled: false
+          k8s.cronjob.uid:
+            enabled: false
+          k8s.cronjob.name:
+            enabled: false
+          k8s.daemonset.name:
+            enabled: false
+          k8s.daemonset.uid:
+            enabled: false
+          k8s.hpa.uid:
+            enabled: false
+          k8s.hpa.name:
+            enabled: false
+          k8s.job.name:
+            enabled: false
+          k8s.job.uid:
+            enabled: false
+          k8s.kubelet.version:
+            enabled: false
+          container.runtime:
+            enabled: false
+          container.runtime.version:
+            enabled: false
+          os.description:
+            enabled: false
+          os.type:
+            enabled: false
+          openshift.clusterquota.uid:
+            enabled: false
+          openshift.clusterquota.name:
+            enabled: false
+          k8s.container.status.last_terminated_reason:
+            enabled: false
+    
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+    
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: kubernetes
+              scrape_interval: 1m
+              body_size_limit: 10MiB
+              kubernetes_sd_configs:
+                - role: pod
+                  namespaces:
+                    names:
+                      - ${env:NAMESPACE_ID}
+                  selectors:
+                    - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_container_init]
+                  regex: "true"
+                  action: drop
+                - source_labels: [__meta_kubernetes_pod_annotation_metrics_dremio_com_scrape]
+                  regex: "true"
+                  action: keep
+                - source_labels: [__address__, __meta_kubernetes_pod_annotation_metrics_dremio_com_port]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                  target_label: __address__
+                - source_labels: [__meta_kubernetes_pod_annotation_metrics_dremio_com_path]
+                  action: replace
+                  target_label: __metrics_path__
+    
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+    
+      batch:
+        send_batch_max_size: 8192
+    
+    exporters:
+      otlp:
+        endpoint: observability.dremio.com:443
+        compression: snappy
+        auth:
+          authenticator: bearertokenauth
+        headers:
+          X-Dremio-ClusterID: ${env:DREMIO_CLUSTER_ID}
+          X-Dremio-ClusterType: ${env:DREMIO_CLUSTER_TYPE}
+    
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus,k8s_cluster]
+          processors: [memory_limiter,batch]
+          exporters: [otlp]
+    
+      telemetry:
+        metrics:
+          level: detailed
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: '0.0.0.0'
+                    port: 8888
+        logs:
+          level: info
+          encoding: json
+          output_paths:	["stdout"]
+          error_output_paths: ["stderr"]
+    
+      extensions: [health_check,bearertokenauth]
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-config
+data:
+  log4j2.properties: |
+    status = error
+
+    appender.console.type = Console
+    appender.console.name = console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
+
+    rootLogger.level = info
+    rootLogger.appenderRef.console.ref = console
+---
+# Source: dremio-enterprise/charts/dremio/templates/zookeeper-configmap.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-config
+  labels:
+    app: zk
+data:
+  logback.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <configuration>
+
+      <!-- Reduce spam from health check commands like "Processing ruok command from IP" -->
+      <logger name="org.apache.zookeeper.server.NIOServerCnxn" level="WARN"/>
+
+      <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+          <pattern>%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n</pattern>
+        </encoder>
+      </appender>
+
+      <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+      </root>
+    </configuration>
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-manager-role-cr.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: dremio-os-operator-dremio-manager-role
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  - statefulsets/status
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - "policy"
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchactiongroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchactiongroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchactiongroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchcomponenttemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchcomponenttemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchcomponenttemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchindextemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchindextemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchindextemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchroles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchroles/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchroles/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchtenants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchtenants/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchtenants/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchuserrolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchuserrolebindings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchuserrolebindings/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+    - opensearch.dremio.io
+  resources:
+    - opensearchismpolicies/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
+    - opensearch.dremio.io
+  resources:
+    - opensearchismpolicies/finalizers
+  verbs:
+    - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+    - opensearch.dremio.io
+  resources:
+    - opensearchismpolicies
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchusers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchusers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchsnapshotpolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchsnapshotpolicies/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - opensearch.dremio.io
+  resources:
+  - opensearchsnapshotpolicies/finalizers
+  verbs:
+  - update
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-metrics-reader-cr.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dremio-os-operator-dremio-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-proxy-role-cr.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dremio-os-operator-dremio-proxy-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+# Source: dremio-enterprise/charts/dremio-mongodb-operator-helm/templates/role.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dremio-dremio-mongodb-operator-helm
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio-mongodb-operator-helm
+    helm.sh/chart: dremio-mongodb-operator-helm-1.21.1-dremio-20251103174242-5f562
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/version: "1.21.0"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+    - psmdb.dremio.com
+    resources:
+    - perconaservermongodbs
+    - perconaservermongodbs/status
+    - perconaservermongodbs/finalizers
+    - perconaservermongodbbackups
+    - perconaservermongodbbackups/status
+    - perconaservermongodbbackups/finalizers
+    - perconaservermongodbrestores
+    - perconaservermongodbrestores/status
+    - perconaservermongodbrestores/finalizers
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    - pods/exec
+    - services
+    - persistentvolumeclaims
+    - secrets
+    - configmaps
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - apps
+    resources:
+    - deployments
+    - replicasets
+    - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - events.k8s.io
+    - ""
+    resources:
+    - events
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - patch
+  - apiGroups:
+    - certmanager.k8s.io
+    - cert-manager.io
+    resources:
+    - issuers
+    - certificates
+    - certificaterequests
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+    - deletecollection
+  - apiGroups:
+    - net.gke.io
+    - multicluster.x-k8s.io
+    resources:
+    - serviceexports
+    - serviceimports
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+    - deletecollection
+---
+# Source: dremio-enterprise/charts/dremio/charts/mongodbOperator/templates/role.yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dremio-mongodb-operator
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: mongodbOperator
+    helm.sh/chart: mongodbOperator-1.21.1-dremio-20251103174242-5f562d3
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/version: "1.21.0"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+    - psmdb.dremio.com
+    resources:
+    - perconaservermongodbs
+    - perconaservermongodbs/status
+    - perconaservermongodbs/finalizers
+    - perconaservermongodbbackups
+    - perconaservermongodbbackups/status
+    - perconaservermongodbbackups/finalizers
+    - perconaservermongodbrestores
+    - perconaservermongodbrestores/status
+    - perconaservermongodbrestores/finalizers
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    - pods/exec
+    - services
+    - persistentvolumeclaims
+    - secrets
+    - configmaps
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - apps
+    resources:
+    - deployments
+    - replicasets
+    - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - events.k8s.io
+    - ""
+    resources:
+    - events
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - patch
+  - apiGroups:
+    - certmanager.k8s.io
+    - cert-manager.io
+    resources:
+    - issuers
+    - certificates
+    - certificaterequests
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+    - deletecollection
+  - apiGroups:
+    - net.gke.io
+    - multicluster.x-k8s.io
+    resources:
+    - serviceexports
+    - serviceimports
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+    - deletecollection
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-leader-election-role-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dremio-os-operator-leader-election-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+# Source: dremio-enterprise/charts/dremio/templates/ddc-roles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ddc-collect-all-pods
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/log
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+---
+# Source: dremio-enterprise/charts/dremio/templates/ddc-roles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ddc-collect-namespace-diagnostics
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - persistentvolumeclaims
+  - persistentvolumes
+  - limitranges
+  - resourcequotas
+  - services
+  - endpoints
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  - daemonsets
+  - replicasets
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-cluster-id.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dremio-cluster-id
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get,patch]
+    # Including the specific resource keeps the permissions very narrow
+    # This wouldn't work with 'create' so we have to pre-create an empty
+    # ConfigMap and then patch it.
+    resourceNames: [dremio-cluster-id]
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: "rbac.authorization.k8s.io/v1"
+kind: "Role"
+metadata:
+  name: "engine-operator-role"
+rules:
+  - apiGroups:
+      - "private.dremio.com"
+    resources:
+      - "engines"
+      - "engines/status"
+      - "engines/finalizers"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "patch"
+      - "update"
+      - "create"
+      - "delete"
+  - apiGroups:
+      - ""
+    resources:
+      - "configmaps"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "patch"
+      - "update"
+      - "delete"
+      - "create"
+  - apiGroups:
+      - "apps"
+    resources:
+      - "statefulsets"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "patch"
+      - "update"
+      - "delete"
+      - "create"
+  - apiGroups:
+      - ""
+    resources:
+      - "persistentvolumeclaims"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "patch"
+      - "delete"
+      - "deletecollection"
+  - apiGroups:
+      - ""
+    resources:
+      - "pods"
+      - "events"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: "rbac.authorization.k8s.io/v1"
+kind: "Role"
+metadata:
+  name: "engine-coordinator-role"
+rules:
+  - apiGroups:
+      - "private.dremio.com"
+    resources:
+      - "engines"
+      - "engines/status"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+  - apiGroups:
+      - "private.dremio.com"
+    resources:
+      - "engines"
+    verbs:
+      - "patch"
+      - "update"
+      - "delete"
+      - "create"
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-telemetry.yaml
+# Role for telemetry observer
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: telemetry-collector
+  labels:
+    app: telemetry-collector
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - events
+      - pods
+      - pods/status
+      - replicationcontrollers
+      - replicationcontrollers/status
+      - resourcequotas
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: dremio-enterprise/charts/dremio-mongodb-operator-helm/templates/role-binding.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: service-account-dremio-dremio-mongodb-operator-helm
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio-mongodb-operator-helm
+    helm.sh/chart: dremio-mongodb-operator-helm-1.21.1-dremio-20251103174242-5f562
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/version: "1.21.0"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: dremio-dremio-mongodb-operator-helm
+roleRef:
+  kind: Role
+  name: dremio-dremio-mongodb-operator-helm
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: dremio-enterprise/charts/dremio/charts/mongodbOperator/templates/role-binding.yaml
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: service-account-dremio-mongodb-operator
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: mongodbOperator
+    helm.sh/chart: mongodbOperator-1.21.1-dremio-20251103174242-5f562d3
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/version: "1.21.0"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: dremio-mongodb-operator
+roleRef:
+  kind: Role
+  name: dremio-mongodb-operator
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-leader-election-rolebinding-rb.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dremio-os-operator-leader-election-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dremio-os-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: dremio-opensearch-operator
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-manager-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dremio-os-operator-dremio-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dremio-os-operator-dremio-manager-role
+subjects:
+- kind: ServiceAccount
+  name: dremio-opensearch-operator
+  namespace: dremio
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-proxy-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dremio-os-operator-dremio-proxy-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dremio-os-operator-dremio-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: dremio-opensearch-operator
+  namespace: dremio
+---
+# Source: dremio-enterprise/charts/dremio/templates/ddc-roles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ddc-collect-all-pods
+subjects:
+- kind: ServiceAccount
+  name:  dremio-coordinator
+  namespace: dremio
+roleRef:
+  kind: Role
+  name: ddc-collect-all-pods
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: dremio-enterprise/charts/dremio/templates/ddc-roles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ddc-collect-namespace-diagnostics
+subjects:
+- kind: ServiceAccount
+  name: dremio-coordinator
+  namespace: dremio
+roleRef:
+  kind: Role
+  name: ddc-collect-namespace-diagnostics
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-cluster-id.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dremio-cluster-id
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dremio-cluster-id
+subjects:
+  - kind: ServiceAccount
+    name: dremio-cluster-id
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: "rbac.authorization.k8s.io/v1"
+kind: "RoleBinding"
+metadata:
+  name: "engine-operator-role-binding"
+  labels:
+    app: "engine-operator"
+roleRef:
+  kind: "Role"
+  apiGroup: "rbac.authorization.k8s.io"
+  name: "engine-operator-role"
+subjects:
+  - kind: "ServiceAccount"
+    namespace: dremio
+    name: dremio-engine-operator
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: "rbac.authorization.k8s.io/v1"
+kind: "RoleBinding"
+metadata:
+  name: "engine-coordinator-role-binding"
+  labels:
+    app: "dremio-coordinator"
+roleRef:
+  kind: "Role"
+  apiGroup: "rbac.authorization.k8s.io"
+  name: "engine-coordinator-role"
+subjects:
+  - kind: "ServiceAccount"
+    namespace: dremio
+    name: dremio-coordinator
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-telemetry.yaml
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: telemetry-collector
+  labels:
+    app: telemetry-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: telemetry-collector
+subjects:
+  - kind: ServiceAccount
+    name: telemetry-collector
+---
+# Source: dremio-enterprise/charts/dremio/charts/nats/templates/headless-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/version: 2.11.0
+    helm.sh/chart: nats-1.3.1
+  name: dremio-nats-headless
+spec:
+  clusterIP: None
+  ports:
+  - appProtocol: tcp
+    name: nats
+    port: 4222
+    targetPort: nats
+  - appProtocol: tcp
+    name: cluster
+    port: 6222
+    targetPort: cluster
+  - appProtocol: http
+    name: monitor
+    port: 8222
+    targetPort: monitor
+  publishNotReadyAddresses: true
+  selector:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/name: nats
+---
+# Source: dremio-enterprise/charts/dremio/charts/nats/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/version: 2.11.0
+    helm.sh/chart: nats-1.3.1
+  name: dremio-nats
+spec:
+  ports:
+  - appProtocol: tcp
+    name: nats
+    port: 4222
+    targetPort: nats
+  selector:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/name: nats
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-controller-manager-metrics-service-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: dremio-os-operator-controller-manager-metrics-service
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-external-service.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-catalog-server-external
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+    catalog-type: external
+spec:
+  type: ClusterIP
+  selector:
+    app: dremio-catalog-server
+    catalog-type: external
+  ports:
+    - name: cat-http-ext
+      port: 8181
+      protocol: TCP
+  sessionAffinity: None
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-external-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-catalog-server-external-mgmt
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+    catalog-type: external
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: dremio-catalog-server
+    catalog-type: external
+  ports:
+    - name: cat-mgmt-ext
+      port: 8182
+      protocol: TCP
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-service.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-catalog-server
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+    catalog-type: internal
+spec:
+  type: ClusterIP
+  selector:
+    app: dremio-catalog-server
+    catalog-type: internal
+  ports:
+    - name: catalog-http
+      port: 9181
+      protocol: TCP
+  sessionAffinity: None
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-catalog-server-mgmt
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+    catalog-type: internal
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: dremio-catalog-server
+    catalog-type: internal
+  ports:
+    - name: catalog-mgmt
+      port: 9182
+      protocol: TCP
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-service.yaml
+# Note: the GRPC service selects pods from both internal and external deployments
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-catalog-server-grpc
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: dremio-catalog-server
+  ports:
+    - name: catalog-grpc
+      port: 9000
+      protocol: TCP
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-services-service.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-catalog-services-server
+spec:
+  type: ClusterIP
+  selector:
+    app: dremio-catalog-services-server
+  ports:
+    - name: catalog-grpc
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-service-client.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-client
+  labels:
+    app: dremio-client
+    
+  
+spec:
+  ports:
+  - port: 31010
+    targetPort: client
+    name: client
+  - port: 9047
+    targetPort: web
+    name: web
+  - port: 32010
+    targetPort: flight
+    name: flight
+  - port: 8181
+    targetPort: cat-http-ext
+    name: cat-http-ext
+  selector:
+    external-client-access: "true"
+  type: LoadBalancer
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-service-client.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dremio-cluster-pod
+spec:
+  ports:
+  - port: 9999
+  clusterIP: None
+  selector:
+    role: dremio-cluster-pod
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-telemetry.yaml
+# Service definition
+apiVersion: v1
+kind: Service
+metadata:
+  name: telemetry-collector-hs
+  labels:
+    app: telemetry-collector
+spec:
+  ports:
+    - name: grpc-otlp
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+  clusterIP: None
+  selector:
+    app: telemetry-collector
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: oidc-proxy
+spec:
+  selector:
+    app: oidc-proxy
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+# Source: dremio-enterprise/charts/dremio/templates/zookeeper.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-hs
+  labels:
+    app: zk
+spec:
+  ports:
+  - port: 2181
+    name: client
+  - port: 2888
+    name: server
+  - port: 3888
+    name: leader-election
+  clusterIP: None
+  selector:
+    app: zk
+---
+# Source: dremio-enterprise/charts/dremio/templates/zookeeper.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: zk-cs
+  labels:
+    app: zk
+spec:
+  ports:
+  - port: 2181
+    name: client
+  selector:
+    app: zk
+---
+# Source: dremio-enterprise/charts/dremio-mongodb-operator-helm/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dremio-dremio-mongodb-operator-helm
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio-mongodb-operator-helm
+    helm.sh/chart: dremio-mongodb-operator-helm-1.21.1-dremio-20251103174242-5f562
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/version: "1.21.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dremio-mongodb-operator-helm
+      app.kubernetes.io/instance: dremio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dremio-mongodb-operator-helm
+        app.kubernetes.io/instance: dremio
+    spec:
+      serviceAccountName: dremio-dremio-mongodb-operator-helm
+      securityContext:
+        {}
+      containers:
+        - name: dremio-mongodb-operator
+          securityContext:
+            {}
+          image: "quay.io/dremio/dremio-mongodb-operator:1.21.1-dremio-20251103171954-1edf5999"
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+            name: metrics
+          - containerPort: 8081
+            protocol: TCP
+            name: health
+          command:
+          - percona-server-mongodb-operator
+          env:
+            - name: LOG_STRUCTURED
+              value: "false"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: WATCH_NAMESPACE
+              value: "dremio"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: dremio-mongodb-operator
+            - name: RESYNC_PERIOD
+              value: "5s"
+            - name: DISABLE_TELEMETRY
+              value: "true"
+            - name: MAX_CONCURRENT_RECONCILES
+              value: "1"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          resources:
+            {}
+---
+# Source: dremio-enterprise/charts/dremio/charts/mongodbOperator/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dremio-mongodb-operator
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: mongodbOperator
+    helm.sh/chart: mongodbOperator-1.21.1-dremio-20251103174242-5f562d3
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/version: "1.21.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodbOperator
+      app.kubernetes.io/instance: dremio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodbOperator
+        app.kubernetes.io/instance: dremio
+    spec:
+      serviceAccountName: dremio-mongodb-operator
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: dremio-mongodb-operator
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          image: "quay.io/dremio/dremio-mongodb-operator:1.21.1-dremio-20251103171954-1edf5999"
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+            name: metrics
+          - containerPort: 8081
+            protocol: TCP
+            name: health
+          command:
+          - percona-server-mongodb-operator
+          env:
+            - name: LOG_STRUCTURED
+              value: "false"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: WATCH_NAMESPACE
+              value: "dremio"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: dremio-mongodb-operator
+            - name: RESYNC_PERIOD
+              value: "5s"
+            - name: DISABLE_TELEMETRY
+              value: "true"
+            - name: MAX_CONCURRENT_RECONCILES
+              value: "1"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: dremio-enterprise/charts/dremio/charts/opensearchOperator/templates/opensearch-operator-controller-manager-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: dremio-os-operator-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=127.0.0.1:8080
+        - --leader-elect
+        - --watch-namespace=dremio
+        - --loglevel=info
+        command:
+        - /manager
+        image: "quay.io/dremio/dremio-opensearch-operator:2.8.0-dremio-20251025004440-1f5a2bd"
+        name: operator-controller-manager
+        imagePullPolicy: "Always"
+        resources:
+          limits:
+            cpu: 200m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 350Mi
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 3
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 3
+        env:
+        - name: DNS_BASE
+          value: cluster.local
+        - name: PARALLEL_RECOVERY_ENABLED
+          value: "true"
+        - name: PPROF_ENDPOINTS_ENABLED
+          value: "false"
+        securityContext:
+          allowPrivilegeEscalation: false
+      nodeSelector:
+        {}
+      tolerations:
+        []
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: dremio-opensearch-operator
+      terminationGracePeriodSeconds: 10
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-deployment.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dremio-catalog-server
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+    catalog-type: internal
+  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dremio-catalog-server
+      catalog-type: internal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dremio
+        app.kubernetes.io/instance: dremio
+        app: dremio-catalog-server
+        app-group: dremio
+        catalog-type: internal
+        
+      annotations:
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "9182"
+        metrics.dremio.com/path: "/metrics"
+        
+    spec:
+      serviceAccountName: dremio-catalog-server
+      
+      
+      
+      
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: copy-run-scripts
+          
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10001
+            runAsNonRoot: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          image: quay.io/dremio/dremio-catalog-server:26.1.1
+          imagePullPolicy: IfNotPresent
+          command: [ "sh", "-c", "cp /opt/jboss/container/java/run/* /mnt/rundir" ]
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: run-scripts
+              mountPath: /mnt/rundir
+        - name: wait-for-mongo
+          image: quay.io/dremio/percona/percona-server-mongodb:8.0.12-4
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MONGODB_USERNAME
+              value: "dremio"
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "dremio-mongodb-app-users"
+                  key: "dremio"
+            - name: MONGODB_CONNECTION_STRING
+              value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+          command:
+            - "sh"
+            - "-c"
+            - |
+              while : ; do
+                echo "Waiting for MongoDB connectivity..."
+                if mongosh --quiet "$(MONGODB_CONNECTION_STRING)" --username "$(MONGODB_USERNAME)" --password "$(MONGODB_PASSWORD)" \
+                 --eval '
+                  disableTelemetry()
+                  let hello = db.hello()
+                  if ((hello.isWritablePrimary || hello.secondary) && hello.hosts.length > 2) {
+                    print("MongoDB service looks ready")
+                  } else {
+                    throw new Error("MongoDB service not ready, retrying in 5 seconds...")
+                  }'; then
+                  break
+                fi
+                sleep 5
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsGroup: 65534
+            runAsUser: 65534
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /.mongodb
+        
+      containers:
+        - name: dremio-catalog-server
+          
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10001
+            runAsNonRoot: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          image: quay.io/dremio/dremio-catalog-server:26.1.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: polaris.persistence.backend.type
+              value: "MongoDb"
+            # polaris.backend.name is kept for compatibility with older catalog images
+            - name: polaris.backend.name
+              value: "MongoDb"
+            - name: polaris.persistence.cache.reference-ttl
+              value: PT0S
+            - name: quarkus.http.port
+              value: "9181"
+            - name: quarkus.management.port
+              value: "9182"
+            - name: quarkus.grpc.server.port
+              value: "9000"
+            - name: quarkus.grpc.clients.roles.host
+              value: "dremio-master-0.dremio-cluster-pod"
+            - name: quarkus.grpc.clients.roles.port
+              value: "45679"
+            - name: quarkus.grpc.clients.fgac.host
+              value: "dremio-master-0.dremio-cluster-pod"
+            - name: quarkus.grpc.clients.fgac.port
+              value: "45679"
+            - name: quarkus.mongodb.database
+              value: "dremio"
+            - name: quarkus.mongodb.connection-string
+              value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+            - name: "quarkus.mongodb.credentials.username"
+              value: "dremio"
+            - name: "quarkus.mongodb.credentials.password"
+              valueFrom:
+                secretKeyRef:
+                  name: "dremio-mongodb-app-users"
+                  key: "dremio"
+            - name: dremio.catalog.storage.enable-vended-credential-refresh
+              value: "true"
+            - name: dremio.catalog.storage.base-location
+              value: ""
+            - name: dremio.catalog.storage.locations
+              value: ""
+            
+            - name: JAVA_OPTS_APPEND
+              value: >-
+                -Dfs.s3a.path.style.access=true -Dfs.s3a.connection.ssl.enabled=true
+          volumeMounts:
+            - name: run-scripts
+              mountPath: /opt/jboss/container/java/run
+            - name: temp-dir
+              mountPath: /tmp
+              readOnly: false
+          ports:
+            - name: catalog-http
+              containerPort: 9181
+              protocol: TCP
+            - name: catalog-mgmt
+              containerPort: 9182
+              protocol: TCP
+            - name: catalog-grpc
+              containerPort: 9000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: catalog-mgmt
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+            terminationGracePeriodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: catalog-mgmt
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+          resources:
+            limits:
+              cpu: "4"
+              memory: 8Gi
+            requests:
+              cpu: "4"
+              memory: 8Gi
+      volumes:
+        - name: run-scripts
+          emptyDir: {}
+        - name: temp-dir
+          emptyDir: {}
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-server-external-deployment.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dremio-catalog-server-external
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app: dremio-catalog-server
+    app-group: dremio
+    catalog-type: external
+  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dremio-catalog-server
+      catalog-type: external
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dremio
+        app.kubernetes.io/instance: dremio
+        app: dremio-catalog-server
+        app-group: dremio
+        catalog-type: external
+        external-client-access: "true"
+        
+      annotations:
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "8182"
+        metrics.dremio.com/path: "/metrics"
+        
+    spec:
+      serviceAccountName: dremio-catalog-server
+      
+      
+      
+      
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: copy-run-scripts
+          
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10001
+            runAsNonRoot: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          image: quay.io/dremio/dremio-catalog-server:26.1.1
+          imagePullPolicy: IfNotPresent
+          command: [ "sh", "-c", "cp /opt/jboss/container/java/run/* /mnt/rundir" ]
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: run-scripts
+              mountPath: /mnt/rundir
+        - name: wait-for-mongo
+          image: quay.io/dremio/percona/percona-server-mongodb:8.0.12-4
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MONGODB_USERNAME
+              value: "dremio"
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "dremio-mongodb-app-users"
+                  key: "dremio"
+            - name: MONGODB_CONNECTION_STRING
+              value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+          command:
+            - "sh"
+            - "-c"
+            - |
+              while : ; do
+                echo "Waiting for MongoDB connectivity..."
+                if mongosh --quiet "$(MONGODB_CONNECTION_STRING)" --username "$(MONGODB_USERNAME)" --password "$(MONGODB_PASSWORD)" \
+                 --eval '
+                  disableTelemetry()
+                  let hello = db.hello()
+                  if ((hello.isWritablePrimary || hello.secondary) && hello.hosts.length > 2) {
+                    print("MongoDB service looks ready")
+                  } else {
+                    throw new Error("MongoDB service not ready, retrying in 5 seconds...")
+                  }'; then
+                  break
+                fi
+                sleep 5
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsGroup: 65534
+            runAsUser: 65534
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /.mongodb
+        
+      containers:
+        - name: dremio-catalog-server-external
+          image: quay.io/dremio/dremio-catalog-server-external:26.1.1
+          imagePullPolicy: IfNotPresent
+          
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10001
+            runAsNonRoot: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: polaris.persistence.backend.type
+              value: "MongoDb"
+            # polaris.backend.name is kept for compatibility with older catalog images
+            - name: polaris.backend.name
+              value: "MongoDb"
+            - name: polaris.persistence.cache.reference-ttl
+              value: PT0S
+            - name: quarkus.http.port
+              value: "8181"
+            - name: quarkus.management.port
+              value: "8182"
+            - name: quarkus.grpc.server.port
+              value: "9000"
+            - name: quarkus.grpc.clients.roles.host
+              value: "dremio-master-0.dremio-cluster-pod"
+            - name: quarkus.grpc.clients.roles.port
+              value: "45679"
+            - name: quarkus.grpc.clients.fgac.host
+              value: "dremio-master-0.dremio-cluster-pod"
+            - name: quarkus.grpc.clients.fgac.port
+              value: "45679"
+            - name: quarkus.oidc.auth-server-url
+              value: "http://dremio-master-0.dremio-cluster-pod.dremio.svc.cluster.local:9047"
+            - name: quarkus.oidc.jwks-path
+              value: "http://dremio-master-0.dremio-cluster-pod.dremio.svc.cluster.local:9047/oauth/discovery/jwks.json"
+            - name: quarkus.mongodb.database
+              value: "dremio"
+            - name: quarkus.mongodb.connection-string
+              value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+            - name: "quarkus.mongodb.credentials.username"
+              value: "dremio"
+            - name: "quarkus.mongodb.credentials.password"
+              valueFrom:
+                secretKeyRef:
+                  name: "dremio-mongodb-app-users"
+                  key: "dremio"
+            - name: dremio.catalog.storage.enable-vended-credential-refresh
+              value: "true"
+            - name: dremio.catalog.storage.base-location
+              value: ""
+            - name: dremio.catalog.storage.locations
+              value: ""
+            
+            - name: JAVA_OPTS_APPEND
+              value: >-
+                -Dfs.s3a.path.style.access=true -Dfs.s3a.connection.ssl.enabled=true
+          volumeMounts:
+            - name: run-scripts
+              mountPath: /opt/jboss/container/java/run
+            - name: temp-dir
+              mountPath: /tmp
+              readOnly: false
+          ports:
+            - name: cat-http-ext
+              containerPort: 8181
+              protocol: TCP
+            - name: cat-mgmt-ext
+              containerPort: 8182
+              protocol: TCP
+            - name: cat-grpc-ext
+              containerPort: 9000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: cat-mgmt-ext
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+            terminationGracePeriodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: cat-mgmt-ext
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+          resources:
+            limits:
+              cpu: "4"
+              memory: 8Gi
+            requests:
+              cpu: "4"
+              memory: 8Gi
+      volumes:
+        - name: run-scripts
+          emptyDir: {}
+        - name: temp-dir
+          emptyDir: {}
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-catalog-services-deployment.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dremio-catalog-services-server
+  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dremio-catalog-services-server
+  template:
+    metadata:
+      labels:
+        app: dremio-catalog-services-server
+        app-group: dremio
+        diagnostics-collector-role: dremio-catalog-services-server
+        
+      annotations:
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "9001"
+        metrics.dremio.com/path: "/q/metrics"
+        
+    spec:
+      serviceAccountName: dremio-catalog-services
+      
+      
+      
+      
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: copy-run-scripts
+          
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10001
+            runAsNonRoot: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          image: quay.io/dremio/dremio-catalog-server:26.1.1
+          imagePullPolicy: IfNotPresent
+          command: [ "sh", "-c", "cp /opt/jboss/container/java/run/* /mnt/rundir" ]
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: run-scripts
+              mountPath: /mnt/rundir
+        - name: wait-for-mongo
+          image: quay.io/dremio/percona/percona-server-mongodb:8.0.12-4
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MONGODB_USERNAME
+              value: "dremio"
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "dremio-mongodb-app-users"
+                  key: "dremio"
+            - name: MONGODB_CONNECTION_STRING
+              value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+          command:
+            - "sh"
+            - "-c"
+            - |
+              while : ; do
+                echo "Waiting for MongoDB connectivity..."
+                if mongosh --quiet "$(MONGODB_CONNECTION_STRING)" --username "$(MONGODB_USERNAME)" --password "$(MONGODB_PASSWORD)" \
+                 --eval '
+                  disableTelemetry()
+                  let hello = db.hello()
+                  if ((hello.isWritablePrimary || hello.secondary) && hello.hosts.length > 2) {
+                    print("MongoDB service looks ready")
+                  } else {
+                    throw new Error("MongoDB service not ready, retrying in 5 seconds...")
+                  }'; then
+                  break
+                fi
+                sleep 5
+              done
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsGroup: 65534
+            runAsUser: 65534
+          resources:
+            limits:
+              cpu: 100m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /.mongodb
+        
+      containers:
+        - name: dremio-catalog-services-server
+          image: quay.io/dremio/dremio-catalog-services-server:26.1.1
+          imagePullPolicy: IfNotPresent
+          
+          securityContext:
+            runAsUser: 10000
+            runAsGroup: 10001
+            runAsNonRoot: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            limits:
+              cpu: "4"
+              memory: 8Gi
+            requests:
+              cpu: "4"
+              memory: 8Gi
+          ports:
+            - name: catalog-grpc
+              containerPort: 9000
+            - name: catalog-mgmt
+              containerPort: 9001
+          volumeMounts:
+            - name: run-scripts
+              mountPath: /opt/jboss/container/java/run
+            - name: temp-dir
+              mountPath: /tmp
+              readOnly: false
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: catalog-mgmt
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+            terminationGracePeriodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: catalog-mgmt
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+            timeoutSeconds: 10
+          env:
+            - name: "services.nats.service-name"
+              value: "dremio-nats"
+            - name: "services.nats.service-port"
+              value: "4222"
+            - name: "services.dremio.catalog.port"
+              value: "9181"
+            - name: "services.dremio.catalog.uri"
+              value: dremio-catalog-server
+            - name: "quarkus.grpc.server.port"
+              value: "9000"
+            - name: "quarkus.management.port"
+              value: "9001"
+            - name: "quarkus.mongodb.connection-string"
+              value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+            - name: "quarkus.log.console.level"
+              value: INFO
+            - name: "quarkus.log.file.level"
+              value: INFO
+            - name: "quarkus.mongodb.credentials.username"
+              value: "dremio"
+            - name: "quarkus.mongodb.database"
+              value: "dremio"
+            - name: "quarkus.mongodb.credentials.password"
+              valueFrom:
+                secretKeyRef:
+                  name: "dremio-mongodb-app-users"
+                  key: "dremio"
+            
+            - name: JAVA_OPTS_APPEND
+              value: >-
+                -Dfs.s3a.path.style.access=true -Dfs.s3a.connection.ssl.enabled=true
+      volumes:
+        - name: run-scripts
+          emptyDir: {}
+        - name: temp-dir
+          emptyDir: {}
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: engine-operator
+  
+  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: engine-operator
+  template:
+    metadata:
+      labels:
+        app: engine-operator
+        role: engine-operator-role
+        diagnostics-collector-role: engine-operator
+        
+      annotations:
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "8080"
+        metrics.dremio.com/path: "/q/metrics"
+        
+    spec:
+      serviceAccountName: dremio-engine-operator
+      
+      
+      
+      
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+      - name: engine-operator
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        image: quay.io/dremio/dremio-engine-operator:26.1.1
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 0.5
+            memory: 1024Mi
+        env:
+        - name: "EXECUTOR_IMAGE"
+          value: quay.io/dremio/dremio-enterprise:26.1.1
+        - name: "KUBERNETES_NAMESPACE"
+          value: dremio
+        - name: "QUARKUS_OPERATOR_SDK_CONTROLLERS_ENGINE_NAMESPACES"
+          value: JOSDK_WATCH_CURRENT
+        - name: "QUARKUS_MONGODB_DATABASE"
+          value: "dremio"
+        - name: "QUARKUS_MONGODB_CONNECTION_STRING"
+          value: "mongodb+srv://dremio-mongodb-rs0.dremio.svc.cluster.local/dremio?ssl=false"
+        - name: "QUARKUS_MONGODB_CREDENTIALS_USERNAME"
+          value: "dremio"
+        - name: "QUARKUS_MONGODB_CREDENTIALS_PASSWORD"
+          valueFrom:
+            secretKeyRef:
+              name: "dremio-mongodb-app-users"
+              key: "dremio"
+        - name: LOG_PVC_VOLUME_NAME
+          value: dremio-log-volume
+        - name: LOG_PVC_DELETE_GRACE_PERIOD
+          value: P7D
+        
+        ports:
+        - containerPort: 8080
+          name: "http"
+          protocol: "TCP"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: "/q/health/live"
+            port: 8080
+            scheme: "HTTP"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 10
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: "/q/health/ready"
+            port: 8080
+            scheme: "HTTP"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 10
+        startupProbe:
+          failureThreshold: 3
+          httpGet:
+            path: "/q/health/started"
+            port: 8080
+            scheme: "HTTP"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 10
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oidc-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oidc-proxy
+  template:
+    metadata:
+      labels:
+        app: oidc-proxy
+        
+    spec:
+      serviceAccountName: dremio-opensearch-aux
+      
+      
+      
+      securityContext:
+        fsGroup: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oidc-proxy
+          image: quay.io/dremio/dremio-search-init:26.1.1
+          imagePullPolicy: 
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+
+              # Read OpenID config and parse jwks_uri from it.
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              ISSUER_URL=$(echo $TOKEN | cut -d '.' -f 2 | base64 -d | jq -r .iss)
+              echo "ISSUER: $ISSUER_URL"
+              if [[ "$ISSUER_URL" == */ ]]; then
+                OPENID_CONFIG_URL="${ISSUER_URL}.well-known/openid-configuration"
+              else
+                OPENID_CONFIG_URL="${ISSUER_URL}/.well-known/openid-configuration"
+              fi
+              USE_TOKEN="true"
+              if [[ "$ISSUER_URL" =~ "googleapis" ]]; then
+                # Google rejects auth header if supplied as bad parameter.
+                echo "Detected GCP from $ISSUER_URL"
+                JWKS_URI="$(curl -sSk "$OPENID_CONFIG_URL" | jq -r .jwks_uri)"
+                USE_TOKEN="false"
+              else
+                JWKS_URI="$(curl -sSk -H "Authorization: Bearer $TOKEN" "$OPENID_CONFIG_URL" | jq -r .jwks_uri)"
+              fi
+
+              if [[ -z "$JWKS_URI" || "$JWKS_URI" == "null" ]]; then
+                echo "Error: JWKS_URI could not be determined" >&2
+                exit 1
+              fi
+              echo "JWKS_URI: $JWKS_URI"
+
+              # Not to deal with shell escaping, save responder code in a shell script.
+              echo '#!/bin/sh
+              read METHOD REQUEST_PATH VERSION
+              if [ "$METHOD" = "GET" ]; then
+                if [ "$USE_TOKEN" = "false" ]; then
+                  BODY=$(curl -sSfk "$JWKS_URI" || true)
+                else
+                  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                  BODY=$(curl -sSfk -H "Authorization: Bearer $TOKEN" "$JWKS_URI" || true)
+                fi
+                # BODY will be empty in case of http errors from the curl calls.
+                if [ -n "$BODY" ]; then
+                  BODY_LEN=${#BODY}
+                  echo "HTTP/1.1 200 OK"
+                  echo "Content-Type: application/json"
+                  echo "Content-Length: $BODY_LEN"
+                  echo
+                  echo "$BODY"
+                else
+                  echo "HTTP/1.1 502 Bad Gateway"
+                  echo "Content-Length: 0"
+                  echo
+                fi
+              else
+                echo "HTTP/1.1 405 Method not allowed"
+                echo
+                echo
+              fi' > /tmp/jwks-responder.sh && chmod +x /tmp/jwks-responder.sh
+
+              # Start socat to listen on port 8080, fork a new process for each connection.
+              export USE_TOKEN JWKS_URI
+              socat TCP-LISTEN:8080,reuseaddr,fork SYSTEM:"/tmp/jwks-responder.sh"
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+# Source: dremio-enterprise/charts/dremio/charts/nats/templates/stateful-set.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: nats
+    app.kubernetes.io/instance: dremio
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: nats
+    app.kubernetes.io/version: 2.11.0
+    helm.sh/chart: nats-1.3.1
+  name: dremio-nats
+spec:
+  podManagementPolicy: Parallel
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nats
+      app.kubernetes.io/instance: dremio
+      app.kubernetes.io/name: nats
+  serviceName: dremio-nats-headless
+  template:
+    metadata:
+      annotations:
+        checksum/config: 246af387963f49bc7a1c52ec926deb2db54b0523d9a631960b428fbafd583640
+      labels:
+        app.kubernetes.io/component: nats
+        app.kubernetes.io/instance: dremio
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: nats
+        app.kubernetes.io/version: 2.11.0
+        helm.sh/chart: nats-1.3.1
+    spec:
+      containers:
+      - args:
+        - --config
+        - /etc/nats-config/nats.conf
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: SERVER_NAME
+          value: $(POD_NAME)
+        image: quay.io/dremio/nats:2.11.8-alpine
+        imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - nats-server
+              - -sl=ldm=/var/run/nats/nats.pid
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz?js-enabled-only=true
+            port: monitor
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: nats
+        ports:
+        - containerPort: 4222
+          name: nats
+        - containerPort: 6222
+          name: cluster
+        - containerPort: 8222
+          name: monitor
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz?js-server-only=true
+            port: monitor
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 750m
+            ephemeral-storage: 4Gi
+            memory: 1536Mi
+          requests:
+            cpu: 500m
+            ephemeral-storage: 50Mi
+            memory: 1024Mi
+        startupProbe:
+          failureThreshold: 90
+          httpGet:
+            path: /healthz
+            port: monitor
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        volumeMounts:
+        - mountPath: /etc/nats-config
+          name: config
+        - mountPath: /var/run/nats
+          name: pid
+        - mountPath: /data
+          name: dremio-nats-js
+      enableServiceLinks: false
+      serviceAccountName: dremio-nats
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: nats
+            app.kubernetes.io/instance: dremio
+            app.kubernetes.io/name: nats
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+      volumes:
+      - configMap:
+          name: dremio-nats-config
+        name: config
+      - emptyDir: {}
+        name: pid
+  volumeClaimTemplates:
+  - metadata:
+      name: dremio-nats-js
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-coordinator.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dremio-coordinator
+  
+  
+spec:
+  serviceName: "dremio-cluster-pod"
+  replicas: 0
+  podManagementPolicy: "Parallel"
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      app: dremio-coordinator
+  template:
+    metadata:
+      labels:
+        app: dremio-coordinator
+        role: dremio-cluster-pod
+        app-group: dremio
+        external-client-access: "true"
+        diagnostics-collector-role: dremio-coordinator
+        
+      annotations:
+        dremio-configmap/checksum: 0fcb4d0804700dbd64a5f64fb0649ae394a900a2a744edf218e5aa884c6c29f2
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "9010"
+        metrics.dremio.com/path: "/metrics"
+        
+    spec:
+      serviceAccountName: dremio-coordinator
+      
+      terminationGracePeriodSeconds: 120
+      
+      
+      
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+      - name: dremio-coordinator
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        image: quay.io/dremio/dremio-enterprise:26.1.1
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 64Gi
+          requests:
+            cpu: "32"
+            memory: 64Gi
+        volumeMounts:
+        - name: dremio-coordinator-volume
+          mountPath: /opt/dremio/data
+        - name: dremio-config
+          mountPath: /opt/dremio/conf
+        - name: dremio-engine-config
+          mountPath: /opt/dremio/conf/engine
+        - name: dremio-hive2-config
+          mountPath: /opt/dremio/plugins/connectors/hive2.d
+        - name: dremio-hive2-config
+          mountPath: /opt/dremio/plugins/connectors/hive2-ee.d
+        - name: dremio-hive3-config
+          mountPath: /opt/dremio/plugins/connectors/hive3.d
+        - name: dremio-hive3-config
+          mountPath: /opt/dremio/plugins/connectors/hive3-ee.d
+        - name: dremio-opensearch
+          mountPath: /opt/dremio/opensearch
+        - name: opensearch-tls-certs
+          mountPath: /opt/dremio/opensearch/tls
+        - name: dremio-license
+          mountPath: /opt/dremio/license
+        
+        - name: dremio-log-volume
+          mountPath: /opt/dremio/log
+        env:
+        - name: DREMIO_MAX_HEAP_MEMORY_SIZE_MB
+          value: "16384"
+        - name: DREMIO_MAX_DIRECT_MEMORY_SIZE_MB
+          value: "43152"
+        - name: DREMIO_JAVA_SERVER_EXTRA_OPTS
+          value: >-
+            -Dfs.s3a.path.style.access=true -Dfs.s3a.connection.ssl.enabled=true 
+            
+            
+            -Ddremio.debug.sysopt.search.v2.enabled=true
+            -Ddremio.debug.sysopt.nextgen_search.ui.enable=true
+            -Ddremio.debug.sysopt.search.logging.enabled=true
+            -Ddremio.debug.sysopt.search.versioned_entity_ingest.enabled=true
+            -Ddremio.debug.sysopt.search.scheduled_reconciliation.enabled=true
+            -Ddremio.debug.sysopt.search.job_ingest.enabled=true
+            
+            -Dservices.dremiocatalog.services-uri=dremio-catalog-services-server
+            -Dservices.dremiocatalog.services-port=9000
+            -Ddremio.debug.sysopt.dremio.catalog.enabled=true
+            -Dservices.dremio.catalog.uri=dremio-catalog-server
+            -Dservices.dremio.catalog.port=9181
+            -Dservices.dremio.catalog.grpc.uri=dremio-catalog-server-grpc
+            -Dservices.dremio.catalog.grpc.port=9000
+            -Dzookeeper=zk-hs:2181
+            -Dservices.coordinator.enabled=true
+            -Dservices.coordinator.master.enabled=false
+            -Dservices.coordinator.master.embedded-zookeeper.enabled=false
+            -Dservices.executor.enabled=false
+            -Dservices.conduit.port=45679
+            -Dservices.nats.service-name=dremio-nats
+            -Dservices.nats.service-port=4222
+            -Dservices.opensearch.service-name=opensearch-cluster
+            -Dservices.opensearch.service-port=9200
+            -XX:ActiveProcessorCount=32
+        - name: AWS_CREDENTIAL_PROFILES_FILE
+          value: "/opt/dremio/aws/credentials"
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: "/opt/dremio/aws/credentials"
+        - name: "KUBERNETES_NAMESPACE"
+          value: dremio
+        - name: DREMIO_LOG_TO_CONSOLE
+          value: "0"
+        - name: DREMIO_LOG_DIR
+          value: /opt/dremio/log
+        
+        - name: DREMIO_HELM_VERSION
+          value: "3.2.1"
+        command: ["/opt/dremio/bin/dremio"]
+        args: ["start-fg"]
+        ports:
+        - containerPort: 31010
+          name: client
+        - containerPort: 32010
+          name: flight
+        - containerPort: 45678
+          name: server-fabric
+        - containerPort: 45679
+          name: server-conduit
+        - containerPort: 9010
+          name: metrics
+        startupProbe:
+          httpGet:
+            path: /
+            port: 9047
+          failureThreshold: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9047
+          failureThreshold: 12
+          periodSeconds: 10
+      initContainers:
+      
+      - name: wait-for-dremio-master
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        image: quay.io/dremio/busybox:1.37.0-glibc
+        imagePullPolicy: IfNotPresent
+        command:  ["sh",
+                   "-c",
+                   "until nc -z dremio-client 9047 > /dev/null; do echo Waiting for Dremio master.; sleep 2; done;"]
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 512Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+      - name: opensearch-init
+        image: quay.io/dremio/dremio-search-opensearch:26.1.1
+        imagePullPolicy: 
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 512Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: dremio-opensearch
+          mountPath: /opt/dremio/opensearch
+        workingDir: "/"
+        command:  ["sh", "-c"]
+        args:
+          - |
+            #!/usr/bin/env bash
+            # Copy model configs, preserve directory structure.
+            set -e
+
+            DESTINATION_DIR=/opt/dremio/opensearch/models
+            mkdir -p $DESTINATION_DIR
+            cd /usr/share/opensearch/custom_models
+            find . -name "*.json" -exec cp --parents {} $DESTINATION_DIR \;
+
+            # Wait for the opensearch service.
+            SVC_NAME=opensearch-cluster
+            PORT=9200
+            until nc $SVC_NAME $PORT -w1 > /dev/null
+            do
+              echo "Waiting for OpenSearch service to be ready at $SVC_NAME:$PORT"
+              sleep 2
+            done
+      volumes:
+      - name: dremio-coordinator-volume
+        emptyDir: {}
+      - name: dremio-config
+        configMap:
+          name: dremio-config
+      - name: dremio-engine-config
+        configMap:
+          name: engine-options
+      - name: dremio-hive2-config
+        configMap:
+          name: dremio-hive2-config
+      - name: dremio-hive3-config
+        configMap:
+          name: dremio-hive3-config
+      - name: dremio-license
+        secret:
+          secretName: dremio-license
+          items:
+            - key: license
+              path: key
+      - name: opensearch-tls-certs
+        secret:
+          secretName: opensearch-tls-certs
+          items:
+          - key: tls.crt
+            path: tls.crt
+      - name: dremio-opensearch
+        emptyDir: {}
+      
+  volumeClaimTemplates:
+  - metadata:
+      name: dremio-log-volume
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      
+      resources:
+        requests:
+          storage: 512Gi
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-master.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dremio-master
+  
+  
+spec:
+  serviceName: "dremio-cluster-pod"
+  podManagementPolicy: "Parallel"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dremio-coordinator
+  template:
+    metadata:
+      labels:
+        app: dremio-coordinator
+        role: dremio-cluster-pod
+        app-group: dremio
+        external-client-access: "true"
+        diagnostics-collector-role: dremio-coordinator
+        
+      annotations:
+        dremio-configmap/checksum: 0fcb4d0804700dbd64a5f64fb0649ae394a900a2a744edf218e5aa884c6c29f2
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "9010"
+        metrics.dremio.com/path: "/metrics"
+        
+    spec:
+      serviceAccountName: dremio-coordinator
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - dremio-coordinator
+              topologyKey: "kubernetes.io/hostname"
+      terminationGracePeriodSeconds: 120
+      
+      
+      
+      
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+      - name: dremio-master-coordinator
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        image: quay.io/dremio/dremio-enterprise:26.1.1
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 64Gi
+          requests:
+            cpu: "32"
+            memory: 64Gi
+        volumeMounts:
+        - name: dremio-master-volume
+          mountPath: /opt/dremio/data
+        - name: dremio-config
+          mountPath: /opt/dremio/conf
+        - name: dremio-engine-config
+          mountPath: /opt/dremio/conf/engine
+        - name: dremio-hive2-config
+          mountPath: /opt/dremio/plugins/connectors/hive2.d
+        - name: dremio-license
+          mountPath: /opt/dremio/license
+        - name: dremio-hive2-config
+          mountPath: /opt/dremio/plugins/connectors/hive2-ee.d
+        - name: dremio-hive3-config
+          mountPath: /opt/dremio/plugins/connectors/hive3.d
+        - name: dremio-hive3-config
+          mountPath: /opt/dremio/plugins/connectors/hive3-ee.d
+        - name: dremio-opensearch
+          mountPath: /opt/dremio/opensearch
+        - name: opensearch-tls-certs
+          mountPath: /opt/dremio/opensearch/tls
+        
+        - name: dremio-log-volume
+          mountPath: /opt/dremio/log
+        env:
+        - name: DREMIO_MAX_HEAP_MEMORY_SIZE_MB
+          value: "16384"
+        - name: DREMIO_MAX_DIRECT_MEMORY_SIZE_MB
+          value: "43152"
+        - name: DREMIO_JAVA_SERVER_EXTRA_OPTS
+          value: >-
+            -Dfs.s3a.path.style.access=true -Dfs.s3a.connection.ssl.enabled=true 
+            
+            
+            -Ddremio.debug.sysopt.search.v2.enabled=true
+            -Ddremio.debug.sysopt.nextgen_search.ui.enable=true
+            -Ddremio.debug.sysopt.search.logging.enabled=true
+            -Ddremio.debug.sysopt.search.versioned_entity_ingest.enabled=true
+            -Ddremio.debug.sysopt.search.scheduled_reconciliation.enabled=true
+            -Ddremio.debug.sysopt.search.job_ingest.enabled=true
+            
+            -Ddremio.debug.sysopt.dremio.catalog.enabled=true
+            -Dservices.dremio.catalog.uri=dremio-catalog-server
+            -Dservices.dremio.catalog.port=9181
+            -Dservices.dremio.catalog.grpc.uri=dremio-catalog-server-grpc
+            -Dservices.dremio.catalog.grpc.port=9000
+            -Dservices.dremiocatalog.services-uri=dremio-catalog-services-server
+            -Dservices.dremiocatalog.services-port=9000
+            -Dzookeeper=zk-hs:2181
+            -Dservices.coordinator.enabled=true
+            -Dservices.coordinator.master.enabled=true
+            -Dservices.coordinator.master.embedded-zookeeper.enabled=false
+            -Dservices.executor.enabled=false
+            -Dservices.conduit.port=45679
+            -Dservices.coordinator.auto-upgrade=true
+            -Dservices.nats.service-name=dremio-nats
+            -Dservices.nats.service-port=4222
+            -Dservices.opensearch.service-name=opensearch-cluster
+            -Dservices.opensearch.service-port=9200
+            -XX:ActiveProcessorCount=32
+        - name: AWS_CREDENTIAL_PROFILES_FILE
+          value: "/opt/dremio/aws/credentials"
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: "/opt/dremio/aws/credentials"
+        - name: "KUBERNETES_NAMESPACE"
+          value: dremio
+        - name: DREMIO_LOG_TO_CONSOLE
+          value: "0"
+        - name: DREMIO_LOG_DIR
+          value: /opt/dremio/log
+        
+        - name: DREMIO_HELM_VERSION
+          value: "3.2.1"
+        command: ["/opt/dremio/bin/dremio"]
+        args:
+        - "start-fg"
+        ports:
+        - containerPort: 9047
+          name: web
+        - containerPort: 31010
+          name: client
+        - containerPort: 32010
+          name: flight
+        - containerPort: 45678
+          name: server-fabric
+        - containerPort: 45679
+          name: server-conduit
+        - containerPort: 9010
+          name: metrics
+        startupProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - |
+                [ -f "/opt/dremio/data/db/.upgrading" ] || curl -k http://localhost:9047
+          failureThreshold: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: web
+          failureThreshold: 12
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - |
+                [ -f "/opt/dremio/data/db/.upgrading" ] || curl -k http://localhost:9047
+          failureThreshold: 30
+          periodSeconds: 10
+      initContainers:
+      
+      - name: start-only-one-dremio-master
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        image: quay.io/dremio/busybox:1.37.0-glibc
+        imagePullPolicy: IfNotPresent
+        command: ["sh",
+                  "-c",
+                  "INDEX=${HOSTNAME##*-}; if [ $INDEX -ne 0 ]; then echo Only one master should be running.; exit 1; fi; "]
+      - name: wait-for-zookeeper-and-nats
+        image: quay.io/dremio/busybox:1.37.0-glibc
+        imagePullPolicy: IfNotPresent
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        command:  ["sh", "-c"]
+        args:
+          - |
+            until nc zk-hs 2181 -w1 > /dev/null
+            do
+              echo Waiting for Zookeeper to be ready
+              sleep 2
+            done
+            until nc dremio-nats 4222 -w1 > /dev/null
+            do
+              echo Waiting for NATS to be ready
+              sleep 2
+            done
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 512Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+      - name: opensearch-init
+        image: quay.io/dremio/dremio-search-opensearch:26.1.1
+        imagePullPolicy: 
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 999
+          runAsNonRoot: true
+          runAsUser: 999
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: dremio-opensearch
+          mountPath: /opt/dremio/opensearch
+        workingDir: "/"
+        command:  ["sh", "-c"]
+        args:
+          - |
+            #!/usr/bin/env bash
+            # Copy model configs, preserve directory structure.
+            set -e
+
+            DESTINATION_DIR=/opt/dremio/opensearch/models
+            mkdir -p $DESTINATION_DIR
+            cd /usr/share/opensearch/custom_models
+            find . -name "*.json" -exec cp --parents {} $DESTINATION_DIR \;
+
+            # Wait for the opensearch service.
+            SVC_NAME=opensearch-cluster
+            PORT=9200
+            until nc $SVC_NAME $PORT -w1 > /dev/null
+            do
+              echo "Waiting for OpenSearch service to be ready at $SVC_NAME:$PORT"
+              sleep 2
+            done
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 512Mi
+          requests:
+            cpu: 10m
+            memory: 10Mi
+      volumes:
+      - name: dremio-config
+        configMap:
+          name: dremio-config
+      - name: dremio-engine-config
+        configMap:
+          name: engine-options
+      - name: dremio-hive2-config
+        configMap:
+          name: dremio-hive2-config
+      - name: dremio-hive3-config
+        configMap:
+          name: dremio-hive3-config
+      - name: dremio-license
+        secret:
+          secretName: dremio-license
+          items:
+            - key: license
+              path: key
+      - name: opensearch-tls-certs
+        secret:
+          secretName: opensearch-tls-certs
+          items:
+          - key: tls.crt
+            path: tls.crt
+      - name: dremio-opensearch
+        emptyDir: {}
+      
+  volumeClaimTemplates:
+  - metadata:
+      name: dremio-log-volume
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      
+      resources:
+        requests:
+          storage: 512Gi
+  - metadata:
+      name: dremio-master-volume
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      
+      resources:
+        requests:
+          storage: 512Gi
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-telemetry.yaml
+# StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: telemetry-collector
+  labels:
+    app: telemetry-collector
+  
+spec:
+  selector:
+    matchLabels:
+      app: telemetry-collector
+  serviceName: telemetry-collector-hs
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: telemetry-collector
+        
+      annotations:
+        dremio-configmap/checksum: 33875c26a14f5836543fea8bd16a82dece92959da43511c6013663523a4259ea
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "8888"
+        metrics.dremio.com/path: "/metrics"
+        cluster.dremio.com/type: "prod"
+        
+    spec:
+      containers:
+        - name: otelcollector
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 999
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          image: quay.io/dremio/otel/opentelemetry-collector-contrib:0.133.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 2
+              memory: 2Gi
+            requests:
+              cpu: 1
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol-contrib/config.yaml
+              subPath: config.yaml
+            - name: license
+              mountPath: /var/opt/dremio/license
+              subPath: license
+          env:
+            - name: GOMEMLIMIT
+              value: 1638MiB
+            - name: DREMIO_CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: dremio-cluster-id
+                  key: cluster_id
+            - name: DREMIO_CLUSTER_TYPE
+              value: "prod"
+            - name: NAMESPACE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: grpc-otlp
+              containerPort: 4317
+            - name: metrics
+              containerPort: 8888
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 13133
+            periodSeconds: 5
+            failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /
+              port: 13133
+            periodSeconds: 5
+            failureThreshold: 4
+      serviceAccountName: telemetry-collector
+      
+      
+      
+      
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+      volumes:
+        - name: config
+          configMap:
+            name: dremio-telemetry-config
+        - name: license
+          secret:
+            secretName: dremio-license
+---
+# Source: dremio-enterprise/charts/dremio/templates/zookeeper.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zk
+  
+  
+spec:
+  selector:
+    matchLabels:
+      app: zk
+  serviceName: zk-hs
+  replicas: 3
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: zk
+        
+      annotations:
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "7000"
+        metrics.dremio.com/path: "/metrics"
+        
+    spec:
+      serviceAccountName: zookeeper
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                    - zk
+              topologyKey: "kubernetes.io/hostname"
+      
+      
+      
+      containers:
+      - name: zookeeper
+        imagePullPolicy: IfNotPresent
+        command:
+        - bash
+        - -ec
+        - |
+            # obtain ZOO_MY_ID based on POD hostname
+            export HOST_NUMBER="${HOSTNAME##*-}"
+            export ZOO_MY_ID="$((HOST_NUMBER + 1))"
+            [ -z "${ZOO_MY_ID}" ] && echo "Failed to get index from hostname $HOSTNAME" && exit 1
+            echo "ZOO_MY_ID=${ZOO_MY_ID}"
+
+            # construct ZOO_SERVERS based on ensemble count
+            DOMAIN="$(hostname -d)"
+            SERVERS=3
+            for (( i=${SERVERS},j=i-1; i>=1; i--,j-- )); do ZOO_SERVERS="server.${i}=zk-${j}.${DOMAIN}:2888:3888;2181 ${ZOO_SERVERS}"; done
+            echo "ZOO_SERVERS=${ZOO_SERVERS}"
+            export ZOO_SERVERS
+
+            /docker-entrypoint.sh
+            echo "metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider" >> /conf/zoo.cfg
+            zkServer.sh start-foreground
+        env:
+        - name: JVMFLAGS
+          value: "-Xmx1024m -Dlogback.configurationFile=/conf/logback.xml"
+        - name: ZOO_STANDALONE_ENABLED
+          value: "false"
+        - name: ZOO_4LW_COMMANDS_WHITELIST
+          value: "ruok"
+        - name: ZOO_ADMINSERVER_ENABLED
+          value: "false"
+        - name: ZOO_AUTOPURGE_PURGEINTERVAL
+          value: "12"
+        image: quay.io/dremio/zookeeper:3.8.4-jre-17
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        ports:
+        - containerPort: 2181
+          name: client
+        - containerPort: 2888
+          name: server
+        - containerPort: 3888
+          name: leader-election
+        - containerPort: 7000
+          name: metrics
+        readinessProbe:
+          exec:
+            command: ["/bin/bash", "-c", "[ \"$(echo ruok | (exec 3<>/dev/tcp/127.0.0.1/2181; cat >&3; cat <&3; exec 3<&-))\" == \"imok\" ]" ]
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          exec:
+            command: ["/bin/bash", "-c", "[ \"$(echo ruok | (exec 3<>/dev/tcp/127.0.0.1/2181; cat >&3; cat <&3; exec 3<&-))\" == \"imok\" ]" ]
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: datadir
+          mountPath: /data
+        - name: confdir
+          mountPath: /conf
+        - name: zookeeper-config
+          mountPath: /conf/logback.xml
+          subPath: logback.xml
+        - name: logdir
+          mountPath: /logs
+        - name: datalogdir
+          mountPath: /datalog
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      volumes:
+      - name: confdir
+        emptyDir: {}
+      - name: zookeeper-config
+        configMap:
+          name: zookeeper-config
+      - name: logdir
+        emptyDir: {}
+      - name: datalogdir
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      
+      resources:
+        requests:
+          storage: 10Gi
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-cluster-id.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dremio-cluster-id
+spec:
+  ttlSecondsAfterFinished: 900
+  template:
+    metadata:
+      name: dremio-cluster-id
+    spec:
+      serviceAccountName: dremio-cluster-id
+      
+      
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
+      restartPolicy: Never
+      containers:
+        - name: dremio-cluster-id
+          
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 999
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          image: quay.io/dremio/dremio-ee-utils:26.1.1
+          imagePullPolicy: IfNotPresent
+          command: [ "bash", "-c" ]
+          args:
+            - |
+              set -e
+              response=$(time curl -kv --retry-connrefused --retry 90 --retry-delay 10 --retry-max-time 900 http://dremio-client:9047/api/v3/cluster/id)
+              echo "$response"
+              cluster_id=$(jq -r .id <<< "$response")
+              existing_cluster_id=$(kubectl get configmap dremio-cluster-id \
+                -o 'jsonpath={.data.cluster_id}')
+              if [ -n "$cluster_id" ] && [ "$cluster_id" != "$existing_cluster_id" ]; then
+                kubectl patch configmap dremio-cluster-id \
+                  --patch "{\"data\":{\"cluster_id\":\"$cluster_id\"}}"
+              fi
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+# OpenSearch TLS certificate rotation.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: opensearch-cert-rotation
+spec:
+  # On the first of every month at midnight UTC.
+  schedule: "0 0 1 * *"
+  # Limits on number of finished jobs to keep.
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      # At most two retries.
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: dremio-opensearch-aux
+          
+          
+          volumes:
+            - name: opensearch-config-scripts
+              configMap:
+                name: opensearch-config-scripts
+                items:
+                  - key: generate_tls_cert.sh
+                    path: generate_tls_cert.sh
+            - name: workdir
+              emptyDir: {}
+          containers:
+            - name: config-generator
+              image: quay.io/dremio/dremio-search-init:26.1.1
+              imagePullPolicy: 
+              volumeMounts:
+                - name: opensearch-config-scripts
+                  mountPath: /opensearch-config-scripts
+                - name: workdir
+                  mountPath: /opensearch
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -e
+
+                  # Copy scripts from read-only volume and make them executable.
+                  cp /opensearch-config-scripts/* /opensearch
+                  chmod +x /opensearch/*.sh
+                  cd /opensearch
+
+                  # Generate TLS certificate.
+                  TLS_CERTS_SECRET_NAME=opensearch-tls-certs
+                  # Include name of the opensearch service into cert domain names.
+                  DOMAIN_NAMES=opensearch-cluster.dremio.svc.cluster.local
+                  /opensearch/generate_tls_cert.sh "$TLS_CERTS_SECRET_NAME" "$DOMAIN_NAMES"
+          # Retry on failure.
+          restartPolicy: OnFailure
+---
+# Source: dremio-enterprise/charts/dremio/templates/ddc-roles.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-admin.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-engine-operator.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-executor-service-account.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-executor.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/dremio-trial-image-pull-credentials-secret.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/openshift-roles.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+apiVersion: opensearch.dremio.io/v1
+kind: OpenSearchCluster
+metadata:
+  name: opensearch-cluster
+spec:
+  initHelper:
+    image: quay.io/dremio/busybox:1.37.0-glibc
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 512Mi
+      requests:
+        cpu: 10m
+        memory: 10Mi
+
+  security:
+    config:
+      # Secret with username and password that is copied by the operator to another secret
+      # which in turn is mounted to /mnt/admin-credentials in the pods.
+      adminCredentialsSecret:
+        name: opensearch-cluster-admin-credentials
+      # This is used by the securityconfig-update job to initialize security.
+      # It takes ~4-6 minutes due to the hard-coded 120s delay between checks:
+      #   https://github.com/opensearch-project/opensearch-k8s-operator/blob/335eb90abc97598655d4127d9d7e140f6c933e36/opensearch-operator/pkg/reconcilers/securityconfig.go#L36
+      adminSecret:
+        name: opensearch-tls-certs-admin
+      securityConfigSecret:
+        name: opensearch-security-config
+    tls:
+      http:
+        secret:
+          name: opensearch-tls-certs
+        generate: false
+      transport:
+        secret:
+          name: opensearch-tls-certs
+        generate: false
+        adminDn: ['CN=admin,OU=Engineering,O=Dremio,L=San Francisco,ST=CA,C=US' ]
+        nodesDn: ['CN=opensearch-cluster.dremio.svc.cluster.local,OU=Engineering,O=Dremio,L=San Francisco,ST=CA,C=US' ]
+  general:
+    image: quay.io/dremio/dremio-search-opensearch:26.1.1
+    version: 3.3.0
+    serviceName: opensearch-cluster
+    serviceAccount: opensearch-cluster
+    setVMMaxMapCount: true
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+    additionalVolumes:
+    - name: temp
+      path: /tmp
+      emptyDir: {}
+    - name: logsdir
+      path: /usr/share/opensearch/logs
+      emptyDir: {}
+    - name: keystore-volume
+      path: /usr/share/opensearch/config/opensearch.keystore
+      subPath: opensearch.keystore
+      secret:
+        secretName: opensearch-keystore-secret
+    additionalConfig:
+      # Change this manually, to trigger rolling restart on changes.
+      # This value does not exist in the opensearch config.
+      change_timestamp: "2006-01-02T15:04:05Z07:00"
+
+      # Disable running models only on dedicated 'ml' nodes.
+      plugins.ml_commons.only_run_on_ml_node: "false"
+
+      # Allow registering custom models.
+      plugins.ml_commons.allow_registering_model_via_url: "true"
+
+      # These thresholds trigger this message "Memory Circuit Breaker is open, please check your resources"
+      # It's unclear how the memory is calculated, setting these to 100 to disable.
+      #   https://opensearch.org/docs/latest/ml-commons-plugin/cluster-settings/#set-native-memory-threshold
+      plugins.ml_commons.native_memory_threshold: "100"
+      plugins.ml_commons.jvm_heap_memory_threshold: "100"
+
+      # Search thread pool parameters.
+      thread_pool.search.queue_size: "1000"
+      thread_pool.search.size: "30"
+
+      # Disable automatic creation of indices on ingest.
+      #   https://opensearch.org/docs/latest/install-and-configure/configuring-opensearch/index-settings/#dynamic-cluster-level-index-settings
+      action.auto_create_index: "security-auditlog-*"
+
+      # Disable creation of top queries indices.
+      search.insights.top_queries.latency.enabled: "false"
+      search.insights.top_queries.cpu.enabled: "false"
+      search.insights.top_queries.memory.enabled: "false"
+
+      ######## Start OpenSearch Security Configuration ########
+      # Enables watching changes to TLS cert files and reloading of them.
+      plugins.security.ssl.certificates_hot_reload.enabled: "true"
+      plugins.security.audit.type: "noop"
+      ######## End OpenSearch Security Configuration ########
+
+  nodePools:
+    - component: nodes
+      replicas: 3
+      diskSize: 100Gi
+      jvm: -Xms10g -Xmx10g
+      resources:  
+        limits:
+          cpu: "2"
+          memory: 16Gi
+        requests:
+          cpu: "2"
+          memory: 16Gi
+      # All replicas share the required roles.
+      roles: [ cluster_manager, data, ml, ingest ]
+      persistence:
+        pvc:
+          
+          accessModes:
+            - ReadWriteOnce
+      affinity: 
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                opensearch.cluster.name: opensearch-cluster
+            topologyKey: kubernetes.io/hostname
+      env:
+        # Disable demo security config.
+        - name: DISABLE_INSTALL_DEMO_CONFIG
+          value: "true"
+      
+      
+      
+      
+  bootstrap:
+    
+    
+    resources: 
+      limits:
+        cpu: "2"
+        memory: 4Gi
+      requests:
+        cpu: "2"
+        memory: 4Gi
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb.yaml
+apiVersion: psmdb.dremio.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: dremio-mongodb
+  namespace: dremio
+  labels:
+    app.kubernetes.io/name: dremio
+    app.kubernetes.io/instance: dremio
+    app-group: dremio
+  
+spec:
+  crVersion: 1.21.1
+  image: quay.io/dremio/percona/percona-server-mongodb:8.0.12-4
+  imagePullPolicy: IfNotPresent
+  
+  tls:
+    mode: preferTLS
+  initContainerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    privileged: false
+    readOnlyRootFilesystem: false
+    runAsGroup: 1001
+    runAsNonRoot: true
+    runAsUser: 1001
+  updateStrategy: SmartUpdate
+  upgradeOptions:
+    # No automatic upgrades
+    apply: Disabled # Recommended, Latest, Disabled
+  secrets:
+    users: dremio-mongodb-system-users
+  users:
+    - name: dremio
+      db: dremio
+      passwordSecretRef:
+        name: dremio-mongodb-app-users
+        key: dremio
+      roles:
+        - name: readWrite
+          db: dremio
+  enableVolumeExpansion: false
+  replsets:
+    - name: rs0
+      size: 3
+      serviceAccountName: dremio-mongodb
+      resources:
+        limits:
+          cpu: 4
+          memory: 2Gi
+        requests:
+          cpu: 2
+          memory: 2Gi
+      
+      
+      annotations:
+        metrics.dremio.com/scrape: "true"
+        metrics.dremio.com/port: "9216"
+        metrics.dremio.com/path: "/metrics"
+        
+      
+      
+      podSecurityContext:
+        fsGroup: 0
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        privileged: false
+        readOnlyRootFilesystem: false
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+      volumeSpec:
+        persistentVolumeClaim:
+          accessModes:
+          - ReadWriteOnce
+          annotations: {}
+          labels: {}
+          resources:
+            requests:
+              storage: 512Gi
+          
+      sidecars:
+      - image: quay.io/dremio/percona/mongodb_exporter:0.47.1
+        name: dremio-mongodb-metrics-exporter
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsGroup: 1001
+          runAsNonRoot: true
+          runAsUser: 1001
+        env:
+        - name: MONGODB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dremio-mongodb-system-users
+              key: MONGODB_CLUSTER_MONITOR_USER
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dremio-mongodb-system-users
+              key: MONGODB_CLUSTER_MONITOR_PASSWORD
+        args: ["--discovering-mode", "--collector.collstats-enable-details", "--collect-all", "--mongodb.uri=mongodb://127.0.0.1:27017", "--mongodb.user=$(MONGODB_USERNAME)", "--mongodb.password=$(MONGODB_PASSWORD)"]
+        ports:
+          - containerPort: 9216
+            name: metrics-mgmt
+  backup:
+    enabled: true
+    image: quay.io/dremio/percona/percona-backup-mongodb:2.11.0
+    storages:
+      dremio-catalog-backups:
+        type: s3
+        main: true
+        s3:
+          bucket: "dremio"
+          region: "us-east-1"
+          endpointUrl: "minio.minio.svc.cluster.local:443"
+          prefix: "catalog-backups"
+          credentialsSecret: dremio-mongodb-backup
+    tasks:
+      - name: dremio-catalog-backups
+        enabled: true
+        storageName: dremio-catalog-backups
+        type: physical
+        schedule: "0 0 * * *"
+        keep: 3
+        compressionType: "gzip"
+        compressionLevel: 1
+    pitr:
+      compressionLevel: 1
+      compressionType: gzip
+      enabled: true
+      oplogOnly: false
+      oplogSpanMin: 10
+    configuration:
+      {}
+    resources:
+      limits:
+        cpu: 300m
+        memory: 1Gi
+      requests:
+        cpu: 300m
+        memory: 1Gi
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      privileged: false
+      readOnlyRootFilesystem: false
+      runAsGroup: 1001
+      runAsNonRoot: true
+      runAsUser: 1001
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb-hooks.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+# Service account to run the pre-delete hook with.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-mongodb-pre-delete
+  namespace: dremio
+  annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    helm.sh/hook-weight: "-10"
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+# Service account to run the pre-install hook with.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dremio-opensearch-aux
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+    helm.sh/hook-weight: "-10"
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+# Config map to store the security configuration file template to update in the job.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-config-scripts
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "-10"
+data:
+  config.yml: |-
+    
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    # See default config in: https://github.com/opensearch-project/security/blob/d2daa9870ca586d80588428d90caacd9739de583/config/config.yml
+    _meta:
+      type: "config"
+      config_version: 2
+    
+    config:
+      dynamic:
+        http:
+          anonymous_auth_enabled: false
+          xff:
+            enabled: false
+        authc:
+          basic_auth:
+            description: "Authenticate via HTTP Basic against internal users database"
+            http_enabled: <ENABLE_HTTP_BASIC_AUTH>
+            transport_enabled: true
+            order: 4
+            http_authenticator:
+              type: basic
+              challenge: true
+            authentication_backend:
+              type: intern
+          openid_auth:
+            description: "Authenticate via Json Web Token using OpenID"
+            http_enabled: true
+            transport_enabled: false
+            order: 0
+            http_authenticator:
+              type: openid
+              challenge: false
+              config:
+                openid_connect_idp:
+                  enable_ssl: false
+                jwks_uri: <JWKS_URI>
+            authentication_backend:
+              type: noop
+        authz: {}
+    
+  roles_mapping.yml: |-
+    
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    # Role mappings provided by opensearch by default are defined in:
+    #   https://github.com/opensearch-project/security/blob/d2daa9870ca586d80588428d90caacd9739de583/config/roles_mapping.yml
+    # Example in the operator:
+    #   https://github.com/opensearch-project/opensearch-k8s-operator/blob/335eb90abc97598655d4127d9d7e140f6c933e36/opensearch-operator/examples/securityconfig-secret.yaml#L37
+    _meta:
+      type: "rolesmapping"
+      config_version: 2
+    
+    # Maps coordinator service account to admin role.
+    all_access:
+      reserved: false
+      backend_roles:
+      - "admin"
+      users:
+        - system:serviceaccount:<NAMESPACE>:<COORDINATOR_SERVICE_ACCOUNT>
+      description: "Maps admin to all_access"
+    
+    own_index:
+      reserved: false
+      users:
+      - "*"
+      description: "Allow full access to an index named like the username"
+    
+    logstash:
+      reserved: false
+      backend_roles:
+      - "logstash"
+    
+    kibana_user:
+      reserved: false
+      backend_roles:
+      - "kibanauser"
+      description: "Maps kibanauser to kibana_user"
+    
+    readall:
+      reserved: false
+      backend_roles:
+      - "readall"
+    
+    manage_snapshots:
+      reserved: false
+      backend_roles:
+      - "snapshotrestore"
+    
+    kibana_server:
+      reserved: true
+      users:
+      - "kibanaserver"
+    
+  generate_security_config.sh: |-
+    
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    #/bin/bash
+    set -e
+    
+    SECRET_NAME=$1
+    CONFIG_TEMPLATE_PATH=$2
+    ENABLE_HTTP_BASIC_AUTH=$3
+    NAMESPACE=$4
+    COORDINATOR_SERVICE_ACCOUNT=$5
+    ROLES_MAPPING_TEMPLATE_PATH=$6
+    
+    # Use proxy to add auth header, the proxy parses issuer from service account
+    # token and uses to get public signing keys.
+    JWKS_URI="http://oidc-proxy.$NAMESPACE.svc.cluster.local"
+    
+    # Read config and replace PEM in it.
+    CONFIG=$(cat "$CONFIG_TEMPLATE_PATH")
+    CONFIG="${CONFIG//<ENABLE_HTTP_BASIC_AUTH>/$ENABLE_HTTP_BASIC_AUTH}"
+    CONFIG="${CONFIG//<JWKS_URI>/$JWKS_URI}"
+    
+    echo "CONFIG: $CONFIG"
+    
+    # Read roles_mapping.yml and replace service account name in it.
+    ROLES_MAPPING=$(cat $ROLES_MAPPING_TEMPLATE_PATH)
+    ROLES_MAPPING="${ROLES_MAPPING//<NAMESPACE>/$NAMESPACE}"
+    ROLES_MAPPING="${ROLES_MAPPING//<COORDINATOR_SERVICE_ACCOUNT>/$COORDINATOR_SERVICE_ACCOUNT}"
+    
+    # Create the Kubernetes secret, make sure it does not exist before creating it.
+    kubectl delete secret $SECRET_NAME --ignore-not-found
+    kubectl create secret generic $SECRET_NAME \
+    --from-literal=config.yml="$CONFIG" \
+    --from-literal=roles_mapping.yml="$ROLES_MAPPING" \
+    --dry-run=client -o yaml | kubectl apply -f -
+    
+  generate_tls_cert.sh: |-
+    
+    #
+    # Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+    #
+    
+    #/bin/bash
+    set -e
+    
+    # Root certificate expires in 10y.
+    CA_EXPIRATION_DAYS=3650
+    # Certificates expire in a year.
+    EXPIRATION_DAYS=365
+    
+    SECRET_NAME=$1
+    DOMAIN_NAMES=$2
+    ROOT_CA_FILE_NAME="ca"
+    CERT_FILE_NAME="tls"
+    
+    # Admin certificate is stored in a separate secret allowing for separate
+    # access control.
+    ADMIN_CERT_FILE_NAME=${CERT_FILE_NAME}-admin
+    ADMIN_CN=admin
+    ADMIN_SECRET_NAME=${SECRET_NAME}-admin
+    
+    # Set variables for certificate details
+    COMPANY="Dremio"
+    ORG="Engineering"
+    
+    # Generate a private key for the root CA.
+    openssl genpkey -algorithm RSA -out ${ROOT_CA_FILE_NAME}.key -pkeyopt rsa_keygen_bits:2048
+    
+    # Generate a self-signed root CA certificate.
+    openssl req -x509 \
+        -new \
+        -nodes \
+        -key ${ROOT_CA_FILE_NAME}.key \
+        -sha256 \
+        -days $CA_EXPIRATION_DAYS \
+        -out ${ROOT_CA_FILE_NAME}.crt \
+        -subj "/C=US/ST=CA/L=San Francisco/O=$COMPANY/OU=$ORG/CN=root-ca"
+    
+    # Generate private keys.
+    openssl genpkey -algorithm RSA -out ${CERT_FILE_NAME}.key -pkeyopt rsa_keygen_bits:2048
+    openssl genpkey -algorithm RSA -out ${ADMIN_CERT_FILE_NAME}.key -pkeyopt rsa_keygen_bits:2048
+    
+    # Split DOMAIN_NAMES by comma and assign to an array.
+    IFS=',' read -ra DOMAINS <<< "$DOMAIN_NAMES"
+    
+    # Get the first domain for the commonName_default.
+    FIRST_DOMAIN="${DOMAINS[0]}"
+    
+    # Generate alt_names section dynamically.
+    ALT_NAMES=""
+    for i in "${!DOMAINS[@]}"; do
+    ALT_NAMES+="DNS.$((i+1)) = ${DOMAINS[i]}"$'\n'
+    done
+    
+    # Create CSRs for the certificates with the DNS and admin names.
+    openssl req -new -key ${CERT_FILE_NAME}.key -out ${CERT_FILE_NAME}.csr -subj "/C=US/ST=CA/L=San Francisco/O=$COMPANY/OU=$ORG/CN=${FIRST_DOMAIN}"
+    openssl req -new -key ${ADMIN_CERT_FILE_NAME}.key -out ${ADMIN_CERT_FILE_NAME}.csr -subj "/C=US/ST=CA/L=San Francisco/O=$COMPANY/OU=$ORG/CN=$ADMIN_CN"
+    
+    # Create a config file for SANs.
+    CSR_CONFIG_TEMPLATE="
+    [ req ]
+    default_bits       = 2048
+    distinguished_name = req_distinguished_name
+    req_extensions     = req_ext
+    x509_extensions    = v3_ca # The extensions to add to the self-signed cert
+    
+    [ req_distinguished_name ]
+    countryName                 = Country Name (2 letter code)
+    countryName_default         = US
+    stateOrProvinceName         = State or Province Name (full name)
+    stateOrProvinceName_default = CA
+    localityName                = Locality Name (eg, city)
+    localityName_default        = San Francisco
+    organizationName            = Organization Name (eg, company)
+    organizationName_default    = $COMPANY
+    organizationalUnitName      = Organizational Unit Name (eg, section)
+    organizationalUnitName_default = $ORG
+    commonName                  = Common Name (e.g. server FQDN or YOUR name)
+    commonName_default          = <COMMON_NAME>
+    commonName_max              = 64
+    
+    [ req_ext ]
+    subjectAltName = @alt_names
+    
+    [ alt_names ]
+    <ALT_NAMES>
+    "
+    
+    # Sign the the CSR with the root CA
+    CSR_CONFIG="${CSR_CONFIG_TEMPLATE//<COMMON_NAME>/$FIRST_DOMAIN}"
+    CSR_CONFIG="${CSR_CONFIG//<ALT_NAMES>/$ALT_NAMES}"
+    echo "$CSR_CONFIG" | cat > ${CERT_FILE_NAME}-ext.cnf
+    cat ${CERT_FILE_NAME}-ext.cnf
+    openssl x509 -req \
+        -in ${CERT_FILE_NAME}.csr \
+        -CA ${ROOT_CA_FILE_NAME}.crt \
+        -CAkey ${ROOT_CA_FILE_NAME}.key \
+        -CAcreateserial \
+        -out ${CERT_FILE_NAME}.crt \
+        -days $EXPIRATION_DAYS \
+        -sha256 \
+        -extfile ${CERT_FILE_NAME}-ext.cnf \
+        -extensions req_ext
+    
+    # Sign the admin CSR with the root CA
+    CSR_CONFIG="${CSR_CONFIG_TEMPLATE//<COMMON_NAME>/$AMIN_CN}"
+    CSR_CONFIG="${CSR_CONFIG//<ALT_NAMES>/DNS.1=admin$'\n'}"
+    echo "$CSR_CONFIG" | cat > ${ADMIN_CERT_FILE_NAME}-ext.cnf
+    cat ${ADMIN_CERT_FILE_NAME}-ext.cnf
+    openssl x509 -req \
+        -in ${ADMIN_CERT_FILE_NAME}.csr \
+        -CA ${ROOT_CA_FILE_NAME}.crt \
+        -CAkey ${ROOT_CA_FILE_NAME}.key \
+        -CAcreateserial \
+        -out ${ADMIN_CERT_FILE_NAME}.crt \
+        -days $EXPIRATION_DAYS \
+        -sha256 \
+        -extfile ${ADMIN_CERT_FILE_NAME}-ext.cnf \
+        -extensions req_ext
+    
+    # Create the Kubernetes secret, make sure it does not exist before creating it.
+    kubectl delete secret $SECRET_NAME --ignore-not-found
+    kubectl create secret generic $SECRET_NAME \
+    --from-file=${CERT_FILE_NAME}.crt \
+    --from-file=${CERT_FILE_NAME}.key \
+    --from-file=${ROOT_CA_FILE_NAME}.crt \
+    --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Rename admin files as they are required to use the same names.
+    rm ${CERT_FILE_NAME}.crt ${CERT_FILE_NAME}.key
+    mv ${ADMIN_CERT_FILE_NAME}.crt ${CERT_FILE_NAME}.crt
+    mv ${ADMIN_CERT_FILE_NAME}.key ${CERT_FILE_NAME}.key
+    
+    # Create the admin Kubernetes secret, make sure it does not exist before creating it.
+    kubectl delete secret $ADMIN_SECRET_NAME --ignore-not-found
+    kubectl create secret generic $ADMIN_SECRET_NAME \
+    --from-file=${CERT_FILE_NAME}.crt \
+    --from-file=${CERT_FILE_NAME}.key \
+    --from-file=${ROOT_CA_FILE_NAME}.crt \
+    --dry-run=client -o yaml | kubectl apply -f -
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb-hooks.yaml
+# Role for the pre-delete hook to delete the mongodb cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dremio-mongodb-pre-delete-role
+  namespace: dremio
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-10"
+rules:
+  - apiGroups: ["psmdb.dremio.com"]
+    resources: ["perconaservermongodbs"]
+    verbs: ["get", "delete", "list", "watch", "patch"]
+  - apiGroups: ["psmdb.dremio.com"]
+    resources: ["perconaservermongodbbackups"]
+    verbs: ["get", "delete", "list", "watch", "patch"]
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+#
+# Copyright (C) 2017-2019 Dremio Corporation. This file is confidential and private property.
+#
+
+#
+# To use Kubernetes service account JWT with OpenSearch, OpenSearch security config must
+# include public portion of the signing key used by the Kubernetes API server. The designers of
+# Open/Elastic search chose to pass this public key as a configuration parameter rather
+# than getting it dynamically from the "iss" URL from the header of JWT and configuring allowed
+# issuers in the security config. Moreover, the signing key must be formatted in two lines: BEGIN
+# header on the first line and rest of the PEM on the second line.
+#
+# Config parameter: https://github.com/opensearch-project/security/blob/d2daa9870ca586d80588428d90caacd9739de583/config/config.yml#L133
+# Key format: https://github.com/opensearch-project/security/blob/d2daa9870ca586d80588428d90caacd9739de583/src/main/java/org/opensearch/security/util/KeyUtils.java#L56
+#
+# The code below:
+#   - Creates service account with permissions to modify secrets and to read config maps from Kubernetes.
+#   - Read JWKS from /openid/v1/jwks Kubernetes API endpoint, use kubectl proxy to auth.
+#   - Read modulus and exponent from JWKS, format them into hexed base64 string with padding.
+#   - Create PEM file with the key using openssl, and then format it into a single line required by KeyUtils.java.
+#   - Replace placeholder in the security config with the resulting value.
+#   - Finally, store a secret where OpenSearch will read the security config from.
+#  The temporary service account, role, rolebinding, configmap are deleted after the job is done.
+
+# Role for reading config maps and creating/updating secrets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dremio-opensearch-aux-role
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "-10"
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "create", "delete"]
+- apiGroups: ["opensearch.dremio.io"]
+  resources: ["opensearchclusters"]
+  verbs: ["get", "delete", "list", "watch", "patch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "create", "update", "delete"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "create", "delete", "list", "watch"]
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb-hooks.yaml
+# Role binding for the pre-delete hook to delete the mongodb cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dremio-mongodb-pre-delete-rolebinding
+  namespace: dremio
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-10"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dremio-mongodb-pre-delete-role
+subjects:
+  - kind: ServiceAccount
+    name: dremio-mongodb-pre-delete
+    namespace: dremio
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+# Role binding to give the service account access to secrets and config maps.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dremio-opensearch-aux-rolebinding
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-weight": "-10"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dremio-opensearch-aux-role
+subjects:
+  - kind: ServiceAccount
+    name: dremio-opensearch-aux
+    namespace: dremio
+---
+# Source: dremio-enterprise/charts/dremio/templates/mongodb-hooks.yaml
+# "helm uninstall" could delete the operator before the custom resources,
+# use pre-delete hook to delete the mongodb cluster.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delete-mongodbcluster
+  namespace: dremio
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      serviceAccountName: dremio-mongodb-pre-delete
+      restartPolicy: Never
+      
+      
+      
+      securityContext:
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: delete-mongodbcluster
+          image: quay.io/dremio/dremio-ee-utils:26.1.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              delete_and_wait() {
+                local kind=$1
+                echo "deleting all $kind..."
+                objects=$(kubectl get "$kind" -n "dremio" -o jsonpath='{.items[*].metadata.name}')
+                kubectl delete -n "dremio" "$kind" --all --ignore-not-found=true --wait=false
+                for object in $objects; do
+                  echo "waiting for $kind/$object to be deleted..."
+                  kubectl wait --for=delete "$kind/$object" -n "dremio" --timeout=90s
+                  if [ $? -ne 0 ]; then
+                    echo "delete operation for $kind/$object did not complete in time, removing finalizers"
+                    kubectl patch "$kind" "$object" -n "dremio" --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+                  fi
+                done
+                echo "all $kind deleted"
+              }
+              delete_and_wait perconaservermongodbbackups.psmdb.dremio.com && \
+              delete_and_wait perconaservermongodbs.psmdb.dremio.com
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 65534
+            runAsNonRoot: true
+            runAsUser: 65534
+          resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+# OpenSearch security config generator job.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensearch-pre-install
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+    "helm.sh/hook-weight": "0"
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: dremio-opensearch-aux
+      
+      
+      
+      volumes:
+        - name: opensearch-config-scripts
+          configMap:
+            name: opensearch-config-scripts
+            items:
+              - key: config.yml
+                path: config.yml
+              - key: roles_mapping.yml
+                path: roles_mapping.yml
+              - key: generate_security_config.sh
+                path: generate_security_config.sh
+              - key: generate_tls_cert.sh
+                path: generate_tls_cert.sh
+        - name: workdir
+          emptyDir: {}
+      securityContext:
+        fsGroup: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: config-generator
+          image: quay.io/dremio/dremio-search-init:26.1.1
+          imagePullPolicy: 
+          volumeMounts:
+            - name: opensearch-config-scripts
+              mountPath: /opensearch-config-scripts
+            - name: workdir
+              mountPath: /opensearch
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+
+              # Copy scripts from read-only volume and make them executable.
+              cp /opensearch-config-scripts/* /opensearch
+              chmod +x /opensearch/*.sh
+              cd /opensearch
+              # Generate TLS certificate.
+              TLS_CERTS_SECRET_NAME=opensearch-tls-certs
+              # Include name of the opensearch service into cert domain names.
+              DOMAIN_NAMES=opensearch-cluster.dremio.svc.cluster.local
+              /opensearch/generate_tls_cert.sh "$TLS_CERTS_SECRET_NAME" "$DOMAIN_NAMES"
+
+              # Create admin password secret.
+              ADMIN_CREDENTIALS_SECRET=opensearch-cluster-admin-credentials
+              kubectl delete secret $ADMIN_CREDENTIALS_SECRET --ignore-not-found
+              kubectl create secret generic $ADMIN_CREDENTIALS_SECRET \
+                -n dremio \
+                --from-literal=username='admin' \
+                --from-literal=password='admin'
+
+              # Generate security config.
+              CONFIG_SECRET_NAME=opensearch-security-config
+              CONFIG_TEMPLATE_PATH="/opensearch/config.yml"
+              ENABLE_HTTP_BASIC_AUTH=true
+              NAMESPACE=dremio
+              COORDINATOR_SERVICE_ACCOUNT=dremio-coordinator
+              ROLES_MAPPING_TEMPLATE_PATH="/opensearch/roles_mapping.yml"
+              /opensearch/generate_security_config.sh \
+                "$CONFIG_SECRET_NAME" \
+                "$CONFIG_TEMPLATE_PATH" \
+                "$ENABLE_HTTP_BASIC_AUTH" \
+                "$NAMESPACE" \
+                "$COORDINATOR_SERVICE_ACCOUNT" \
+                "$ROLES_MAPPING_TEMPLATE_PATH"
+      restartPolicy: OnFailure
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+---
+# Job 1: Create keystore and populate it
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensearch-keystore-creator
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+    "helm.sh/hook-weight": "-4"
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: dremio-opensearch-aux
+      
+      
+      
+      volumes:
+        - name: keystore-volume
+          emptyDir: {}
+        - name: config-volume
+          emptyDir: {}
+      securityContext:
+        fsGroup: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: keystore-creator
+          image: quay.io/dremio/dremio-search-opensearch:26.1.1
+          volumeMounts:
+            - name: keystore-volume
+              mountPath: /tmp/keystore
+            - name: config-volume
+              mountPath: /usr/share/opensearch/config
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              echo "Creating keystore..."
+              if [ ! -f /usr/share/opensearch/config/opensearch.keystore ]; then
+                /usr/share/opensearch/bin/opensearch-keystore create
+              fi
+              cp -a /usr/share/opensearch/config/opensearch.keystore /tmp/keystore/
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      containers:
+        - name: keystore-to-configmap
+          image: quay.io/dremio/dremio-ee-utils:26.1.1
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: keystore-volume
+              mountPath: /tmp/keystore
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+
+              # Check if keystore file exists
+              if [ ! -f /tmp/keystore/opensearch.keystore ]; then
+                echo "Error: Keystore file not found"
+                exit 1
+              fi
+
+              # Create Secret
+              echo "Creating Secret"
+              kubectl create secret generic opensearch-keystore-secret -n dremio --from-file=/tmp/keystore/opensearch.keystore
+              echo "Secret created successfully"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      restartPolicy: OnFailure
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: opensearch-post-init-delay
+  labels:
+    app: opensearch-post-init-delay
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: dremio-opensearch-aux
+      
+      
+      securityContext:
+        fsGroup: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: apply-delay
+        image: quay.io/dremio/dremio-search-init:26.1.1
+        command: ["sh","-ceu"]
+        args:
+          - |
+            OS_HOST="opensearch-cluster"
+            PORT=9200
+            OS_URL="https://${OS_HOST}:${PORT}"
+            CURL="curl --fail --show-error --silent --connect-timeout 5 --max-time 10 --cert /tls/tls.crt --key /tls/tls.key --cacert /tls/ca.crt --insecure"
+            echo "Configuring OpenSearch delayed node-left timeout with retries..."
+            curl_with_retry() {
+              MAX=180; DELAY=10
+              for i in $(seq 1 $MAX); do
+                echo "Attempt $i/$MAX: $*"
+                if "$@"; then return 0; fi
+                echo "  -> failed (exit $?), retrying in ${DELAY}s..."
+                sleep $DELAY
+              done
+              echo "ERROR: command failed after ${MAX} attempts"
+              return 1
+            }
+            curl_with_retry $CURL -XPUT "${OS_URL}/_index_template/delayed-node-left" \
+              -H 'Content-Type: application/json' -d '{
+                "index_patterns": ["*"],
+                "template": { "settings": { "index.unassigned.node_left.delayed_timeout": "10m" } },
+                "priority": 1,
+                "version": 1
+              }'
+            curl_with_retry $CURL -XPUT "${OS_URL}/*/_settings?expand_wildcards=open,closed&allow_no_indices=true&ignore_unavailable=true" \
+              -H 'Content-Type: application/json' -d '{
+                "index.unassigned.node_left.delayed_timeout": "10m"
+              }'
+            # Verify (non-fatal)
+            $CURL "${OS_URL}/*/_settings?expand_wildcards=all&filter_path=**.index.unassigned.node_left.delayed_timeout&pretty" | tee /dev/stderr >/dev/null || true
+        volumeMounts:
+        - name: admin-certs
+          mountPath: /tls
+          readOnly: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsGroup: 1001
+          runAsNonRoot: true
+          runAsUser: 1001
+          seccompProfile:
+            type: RuntimeDefault
+      volumes:
+      - name: admin-certs
+        secret:
+          secretName: opensearch-tls-certs-admin   # contains ca.crt, tls.crt, tls.key
+---
+# Source: dremio-enterprise/charts/dremio/templates/opensearch.yaml
+# "helm uninstall" could delete the operator before the custom resources,
+# use pre-delete hook to delete open search cluster.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: delete-opensearchcluster
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      serviceAccountName: dremio-opensearch-aux
+      restartPolicy: Never
+      
+      
+      
+      securityContext:
+        fsGroup: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: delete-opensearchcluster
+          image: quay.io/dremio/dremio-ee-utils:26.1.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              set -e
+              kubectl delete  -n dremio opensearchclusters.opensearch.dremio.io --all --ignore-not-found=true &
+              # we try to check the status of the delete operation for 90 seconds with 10 seconds intervals between checks
+              # if it does not complete in that time we leave 30 seconds (subtracting 90 seconds from the activeDeadlineSeconds of 120 seconds = 30)
+              # for the patch operations to remove finalizers
+              for i in 1 2 3 4 5 6 7 8 9; do
+                CLUSTER_COUNT=$(kubectl get opensearchclusters.opensearch.dremio.io -n dremio --no-headers | wc -l)
+                echo "cluster count $CLUSTER_COUNT"
+                if [ $CLUSTER_COUNT -eq 0 ]; then
+                  echo "opensearchcluster object deleted blocking until process kubectl exits"
+                  wait
+                  exit 0
+                else
+                  echo "waiting for $CLUSTER_COUNT opensearchcluster(s) to be deleted - $i/9"
+                  sleep 10
+                fi
+              done
+              echo "delete is being blocked by finalizers, force removing finalizers"
+              # run the patch operation to remove finalizers
+              OBJECTS=$(kubectl get opensearchclusters.opensearch.dremio.io -n dremio -o jsonpath='{.items[*].metadata.name}')
+              for OBJECT in $OBJECTS; do
+                kubectl patch opensearchcluster.opensearch.dremio.io $OBJECT -n dremio --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+              done
+              echo "delete opensearch cluster completed"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seccompProfile:
+              type: RuntimeDefault
+# End of opensearch.enabled if.

@@ -203,29 +203,18 @@ deploy_minio_tenant() {
   echo "Deploying MinIO Tenant..."
   kubectl create namespace minio --dry-run=client -o yaml | kubectl apply -f -
   
-  # Create tenant TLS certificate if it doesn't exist (required for STS communication)
-  echo "Checking for tenant TLS certificate..."
-  if ! kubectl get secret minio-tls -n minio >/dev/null 2>&1; then
-    echo "Creating tenant TLS certificate..."
-    openssl req -x509 -newkey rsa:2048 -keyout /tmp/minio-key.pem -out /tmp/minio-cert.pem -days 365 -nodes \
-      -subj "/CN=minio.minio.svc.cluster.local" \
-      -addext "subjectAltName=DNS:minio.minio.svc.cluster.local,DNS:*.minio.minio.svc.cluster.local,DNS:*.minio-hl.minio.svc.cluster.local,DNS:minio-console.minio.svc.cluster.local" 2>/dev/null
-    
-    # MinIO expects public.crt and private.key (not tls.crt and tls.key)
-    kubectl create secret generic minio-tls -n minio \
-      --from-file=public.crt=/tmp/minio-cert.pem \
-      --from-file=private.key=/tmp/minio-key.pem
-    rm -f /tmp/minio-key.pem /tmp/minio-cert.pem
-    echo "✓ Tenant TLS certificate created"
-  else
-    echo "✓ Tenant TLS certificate already exists"
-  fi
+  # DISABLED: Tenant TLS certificate creation (causes health check issues with self-signed certs)
+  # For production, use proper certificates from cert-manager or external CA
   
-  # Pass OIDC secret and explicitly disable requestAutoCert via --set
+  # Clean up any existing TLS secret to ensure TLS is disabled
+  echo "Cleaning up old TLS secrets..."
+  kubectl delete secret minio-tls -n minio 2>/dev/null || true
+  
+  # Deploy without TLS to avoid self-signed certificate issues
+  # Force requestAutoCert=false via multiple methods to ensure it's respected
   helm upgrade --install minio minio-operator/tenant -n minio -f helm/minio/tenant-values.yaml \
     --set tenant.requestAutoCert=false \
-    --set tenant.externalCertSecret[0].name=minio-tls \
-    --set tenant.externalCertSecret[0].type=kubernetes.io/tls \
+    --set tenant.features.enableSFTP=false \
     --set tenant.configuration.envs[2].name=MINIO_IDENTITY_OPENID_CLIENT_ID \
     --set tenant.configuration.envs[2].value=minio \
     --set tenant.configuration.envs[3].name=MINIO_IDENTITY_OPENID_CLIENT_SECRET \
@@ -252,7 +241,7 @@ configure_minio_policies() {
   kubectl run minio-policy-setup-v2 --image=minio/mc:latest --restart=Never --rm -i --command -- /bin/bash -c "
     set -e
     echo 'Connecting to MinIO...'
-    # Retry loop for connection
+    # Retry loop for connection - using HTTP since TLS is disabled
     for i in {1..30}; do
       if mc alias set myminio https://minio.minio.svc.cluster.local:443 '$MINIO_ROOT_USER' '$MINIO_ROOT_PASSWORD' --insecure; then
         echo 'Connected to MinIO'
@@ -276,7 +265,7 @@ configure_minio_policies() {
   ]
 }
 EOF
-    mc admin policy create myminio data-science /tmp/policy-ds.json --insecure || true
+    mc admin policy create myminio data-science /tmp/policy-ds.json || true
 
     # Admin Policy (Full Admin)
     echo 'Creating admin policies...'
@@ -297,9 +286,9 @@ EOF
   ]
 }
 EOF
-    mc admin policy create myminio admin /tmp/policy-admin.json --insecure || true
-    mc admin policy create myminio vault-admins /tmp/policy-admin.json --insecure || true
-    mc admin policy create myminio admins /tmp/policy-admin.json --insecure || true
+    mc admin policy create myminio admin /tmp/policy-admin.json || true
+    mc admin policy create myminio vault-admins /tmp/policy-admin.json || true
+    mc admin policy create myminio admins /tmp/policy-admin.json || true
 
     echo '✓ Policies Configured'
   "
@@ -498,7 +487,7 @@ print_completion_message() {
   echo "========================================="
   echo "MinIO Ready!"
   echo "========================================="
-  echo "Console: http://localhost:9091"
+  echo "Console: https://localhost:9091"
   echo "Login: Click 'Login with OpenID' -> Login with 'admin' / 'admin'"
   echo ""
 }
