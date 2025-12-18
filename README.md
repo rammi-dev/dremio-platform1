@@ -8,10 +8,12 @@ graph LR
         KC[🔐 Keycloak] --> Vault[🔑 Vault]
         KC --> MinIO[📦 MinIO]
         KC --> JH[📓 JupyterHub]
+        KC --> AF[🔄 Airflow]
         KC --> Dremio[🔍 Dremio]
         
         JH -->|STS| MinIO
         Spark[⚡ Spark] -->|S3A| MinIO
+        AF -->|Orchestrate| Spark
         Dremio -->|S3| MinIO
     end
 ```
@@ -91,14 +93,17 @@ graph TB
     KC -->|Auth| Vault
     KC -->|Auth| MinIO
     KC -->|OAuth| JH[JupyterHub]
+    KC -->|Auth| AF[Airflow]
     KC -->|Auth| Dremio
     
     JH -->|STS Credentials| MinIO
+    AF -->|Orchestrate| Spark
     Spark -->|S3A| MinIO
     Dremio -->|S3| MinIO
     
     subgraph "Data Processing"
         JH
+        AF
         Spark[Spark Jobs]
         Dremio
     end

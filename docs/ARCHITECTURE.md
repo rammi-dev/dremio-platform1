@@ -22,6 +22,7 @@ graph TB
         
         subgraph Compute["Data Processing"]
             JH[📓 JupyterHub<br/>Notebooks]
+            AF[🔄 Airflow<br/>Workflow Orchestration]
             Spark[⚡ Spark<br/>Distributed Compute]
             Dremio[🔍 Dremio<br/>SQL Analytics]
         end
@@ -31,9 +32,11 @@ graph TB
     KC -->|Auth| Vault
     KC -->|Auth| MinIO
     KC -->|Auth| JH
+    KC -->|Auth| AF
     KC -->|Auth| Dremio
     
     JH -->|STS Credentials| MinIO
+    AF -->|Orchestrate| Spark
     Spark -->|S3 API| MinIO
     Dremio -->|S3 API| MinIO
     
