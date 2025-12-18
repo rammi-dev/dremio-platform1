@@ -39,6 +39,7 @@ graph TB
     AF -->|Orchestrate| Spark
     AF -->|dbt Jobs| Dremio
     Spark -->|S3 API| MinIO
+    Spark -->|Arrow Flight| Dremio
     Dremio -->|S3 API| MinIO
     
     Vault -->|Secrets| MinIO

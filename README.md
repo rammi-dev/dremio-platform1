@@ -13,6 +13,7 @@ graph LR
         
         JH -->|STS| MinIO
         Spark[⚡ Spark] -->|S3A| MinIO
+        Spark -->|Arrow Flight| Dremio
         AF -->|Orchestrate| Spark
         AF -->|dbt| Dremio
         Dremio -->|S3| MinIO
@@ -101,6 +102,7 @@ graph TB
     AF -->|Orchestrate| Spark
     AF -->|dbt Jobs| Dremio
     Spark -->|S3A| MinIO
+    Spark -->|Arrow Flight| Dremio
     Dremio -->|S3| MinIO
     
     subgraph "Data Processing"
