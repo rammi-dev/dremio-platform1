@@ -81,6 +81,13 @@ graph TB
 - **Features**: SparkApplication CRD, Spark Connect support
 - **Storage**: MinIO via S3A connector
 
+#### Airflow (Workflow Orchestration)
+- **Purpose**: Schedule and monitor data pipelines
+- **Namespace**: `airflow`
+- **Executor**: LocalExecutor (standalone mode)
+- **Auth**: Keycloak Auth Manager
+- **Storage**: PostgreSQL for metadata
+
 #### Dremio (SQL Analytics)
 - **Purpose**: Data lakehouse query engine with SQL interface
 - **Namespace**: `dremio`
@@ -94,7 +101,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant User
-    participant Service as Service<br/>(Vault/MinIO/JupyterHub/Dremio)
+    participant Service as Service<br/>(Vault/MinIO/JupyterHub/Airflow/Dremio)
     participant KC as Keycloak
     
     User->>Service: Access Request
@@ -117,7 +124,8 @@ graph LR
             C1[vault]
             C2[minio]
             C3[jupyterhub]
-            C4[dremio]
+            C4[airflow]
+            C5[dremio]
         end
         
         subgraph Groups
@@ -125,21 +133,31 @@ graph LR
             G2[minio-access]
             G3[jupyterhub]
             G4[data-science]
+            G5[airflow-admin]
+            G6[data-engineers]
+            G7[data-scientists]
         end
         
         subgraph Users
             U1[admin]
+            U2[jupyter-admin]
+            U3[jupyter-ds]
         end
     end
     
     U1 --> G1
     U1 --> G2
     U1 --> G3
+    U1 --> G5
+    
+    U2 --> G6
+    U3 --> G7
     
     C1 -->|OIDC| Vault[Vault]
     C2 -->|OIDC| MinIO[MinIO]
     C3 -->|OAuth| JH[JupyterHub]
-    C4 -->|OIDC| Dremio[Dremio]
+    C4 -->|Keycloak Auth| AF[Airflow]
+    C5 -->|OIDC| Dremio[Dremio]
 ```
 
 ---

@@ -25,6 +25,7 @@ graph LR
 | **MinIO** | S3-Compatible Object Storage | `minio` |
 | **JupyterHub** | Interactive Notebooks | `jupyterhub` |
 | **Spark Operator** | Distributed Computing | `operators` |
+| **Airflow** | Workflow Orchestration | `airflow` |
 | **Dremio** | SQL Analytics Engine | `dremio` |
 
 ---
@@ -57,7 +58,10 @@ gcloud container clusters get-credentials <cluster-name> --zone <zone> --project
 # 4. Distributed Computing (Spark)
 ./scripts/deploy-spark-operator.sh
 
-# 5. SQL Analytics (Dremio) - Optional
+# 5. Workflow Orchestration (Airflow)
+./scripts/deploy-airflow-gke.sh
+
+# 6. SQL Analytics (Dremio) - Optional
 ./scripts/deploy-dremio-ee.sh
 ```
 
@@ -73,6 +77,7 @@ gcloud container clusters get-credentials <cluster-name> --zone <zone> --project
 | Vault | http://localhost:8200 | OIDC or Token |
 | MinIO | https://localhost:9091 | "Login with OpenID" |
 | JupyterHub | http://localhost:8000 | "Sign in with Keycloak" |
+| Airflow | http://localhost:8085 | Keycloak OIDC |
 | Dremio | http://localhost:9047 | (when deployed) |
 
 ---
@@ -158,6 +163,7 @@ graph TB
 | [ACCESS.md](docs/ACCESS.md) | All credentials, auth methods, policies |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Complete GKE deployment guide |
 | [JUPYTERHUB.md](docs/JUPYTERHUB.md) | JupyterHub OAuth configuration |
+| [AIRFLOW.md](docs/AIRFLOW.md) | Airflow Keycloak Auth Manager setup |
 | [MINIO_STS.md](docs/MINIO_STS.md) | MinIO STS credential generation |
 | [VAULT_OIDC.md](docs/VAULT_OIDC.md) | Vault OIDC login troubleshooting |
 
@@ -171,6 +177,7 @@ graph TB
 | `deploy-minio-gke.sh` | Deploy MinIO with OIDC + STS |
 | `deploy-jupyterhub-gke.sh` | Deploy JupyterHub with OAuth |
 | `deploy-spark-operator.sh` | Deploy Spark Operator |
+| `deploy-airflow-gke.sh` | Deploy Airflow with Keycloak Auth |
 | `deploy-dremio-ee.sh` | Deploy Dremio Enterprise |
 | `start-port-forwards.sh` | Start all port forwards |
 | `show-access-info.sh` | Display all credentials |

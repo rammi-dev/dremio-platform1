@@ -13,6 +13,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 │  Identity & Security    │  Storage    │  Data Processing        │
 │  ├── Keycloak (OIDC)    │  └── MinIO  │  ├── JupyterHub         │
 │  └── Vault (Secrets)    │             │  ├── Spark Operator     │
+│                         │             │  ├── Airflow            │
 │                         │             │  └── Dremio             │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -26,6 +27,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 | **MinIO** | S3-Compatible Object Storage | `minio` |
 | **JupyterHub** | Interactive Notebooks | `jupyterhub` |
 | **Spark Operator** | Distributed Computing | `operators` |
+| **Airflow** | Workflow Orchestration | `airflow` |
 | **Dremio** | SQL Analytics Engine | `dremio` |
 
 ## Project Structure
@@ -45,6 +47,9 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 │   │   └── values.yaml
 │   ├── spark/
 │   │   └── Chart.yaml
+│   ├── airflow/
+│   │   ├── values.yaml
+│   │   └── README.md
 │   ├── dremio/
 │   │   └── values.yaml
 │   └── postgres/
@@ -54,6 +59,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 │   ├── deploy-minio-gke.sh    # Deploy MinIO with OIDC
 │   ├── deploy-jupyterhub-gke.sh # Deploy JupyterHub with OAuth
 │   ├── deploy-spark-operator.sh # Deploy Spark Operator
+│   ├── deploy-airflow-gke.sh  # Deploy Airflow with Keycloak Auth
 │   ├── deploy-dremio-ee.sh    # Deploy Dremio Enterprise
 │   ├── start-port-forwards.sh # Start all port forwards
 │   ├── show-access-info.sh    # Display credentials
@@ -62,11 +68,13 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 │   └── lib/                   # Shared bash functions
 │       ├── minio-common.sh
 │       ├── jupyterhub-common.sh
+│       ├── airflow-common.sh
 │       └── dremio-common.sh
 ├── docs/                      # Documentation
 │   ├── ARCHITECTURE.md        # Architecture with Mermaid diagrams
 │   ├── ACCESS.md              # Credentials and access control
 │   ├── DEPLOYMENT.md          # GKE deployment guide
+│   ├── AIRFLOW.md             # Airflow Keycloak Auth Manager setup
 │   ├── GITOPS_PROPOSAL.md     # GitOps transformation plan
 │   └── ...
 ├── config/                    # Generated configs (gitignored)
@@ -117,6 +125,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 | `minio` | MinIO Tenant |
 | `jupyterhub` | JupyterHub Hub, Proxy |
 | `jupyterhub-users` | User notebook pods |
+| `airflow` | Airflow webserver, scheduler, PostgreSQL |
 | `dremio` | Dremio coordinators, executors |
 
 ### Deployment Order
@@ -125,7 +134,8 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 2. `deploy-minio-gke.sh` - MinIO (depends on Keycloak for OIDC)
 3. `deploy-jupyterhub-gke.sh` - JupyterHub (depends on Keycloak + MinIO)
 4. `deploy-spark-operator.sh` - Spark Operator
-5. `deploy-dremio-ee.sh` - Dremio (optional, requires license)
+5. `deploy-airflow-gke.sh` - Airflow (depends on Keycloak)
+6. `deploy-dremio-ee.sh` - Dremio (optional, requires license)
 
 ### Authentication Flow
 
@@ -151,6 +161,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 | Vault | 8200 | `kubectl port-forward -n vault svc/vault 8200:8200` |
 | MinIO Console | 9091 | `kubectl port-forward -n minio svc/minio-console 9091:9443` |
 | JupyterHub | 8000 | `kubectl port-forward -n jupyterhub svc/proxy-public 8000:80` |
+| Airflow | 8085 | `kubectl port-forward -n airflow svc/airflow-webserver 8085:8080` |
 | Dremio | 9047 | `kubectl port-forward -n dremio svc/dremio-client 9047:9047` |
 
 ### Common Tasks
@@ -161,6 +172,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 ./scripts/deploy-minio-gke.sh
 ./scripts/deploy-jupyterhub-gke.sh
 ./scripts/deploy-spark-operator.sh
+./scripts/deploy-airflow-gke.sh
 ```
 
 #### Start Port Forwards
@@ -175,7 +187,7 @@ This repository provides a data platform deployed on Google Kubernetes Engine (G
 
 #### Check Pod Status
 ```bash
-kubectl get pods -A | grep -E '^(operators|vault|minio|jupyterhub|dremio)'
+kubectl get pods -A | grep -E '^(operators|vault|minio|jupyterhub|airflow|dremio)'
 ```
 
 ### Security Considerations
@@ -199,5 +211,6 @@ See `docs/GITOPS_PROPOSAL.md` for the planned transition to:
 - Main documentation: `README.md`
 - Architecture details: `docs/ARCHITECTURE.md`
 - Access & credentials: `docs/ACCESS.md`
+- Airflow setup: `docs/AIRFLOW.md`
 - Deployment guide: `docs/DEPLOYMENT.md`
 - GitOps roadmap: `docs/GITOPS_PROPOSAL.md`
