@@ -13,14 +13,16 @@ workers:
 flower:
   enabled: false
 
-# Enable triggerer for async operations
-triggerer:
-  enabled: true
-  replicas: 1
-
 # PostgreSQL database configuration
 postgresql:
   enabled: true
+  image:
+    registry: docker.io
+    repository: postgres
+    tag: "16-alpine"
+  primary:
+    persistence:
+      size: 1Gi
 
 # Redis (disabled for LocalExecutor)
 redis:
@@ -37,17 +39,31 @@ webserver:
       memory: "2Gi"
       cpu: "1000m"
   
-  # Default admin user (fallback before Keycloak auth is initialized)
+  # Disable default admin user - using Keycloak for authentication
   defaultUser:
-    enabled: true
-    role: Admin
-    username: admin
-    email: admin@airflow.local
-    firstName: Airflow
-    lastName: Admin
-    password: admin
+    enabled: false
 
-# Scheduler configuration
+# DAGs configuration - use persistent volume
+dags:
+  persistence:
+    enabled: true
+    size: 1Gi
+    accessMode: ReadWriteOnce
+
+# Logs configuration - disabled (GKE standard-rwo doesn't support ReadWriteMany)
+# Uses emptyDir instead - logs are ephemeral but pods can all write
+logs:
+  persistence:
+    enabled: false
+
+# Triggerer and scheduler configuration with small persistence
+triggerer:
+  enabled: true
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 1Gi
+
 scheduler:
   replicas: 1
   resources:
@@ -57,22 +73,14 @@ scheduler:
     limits:
       memory: "2Gi"
       cpu: "1000m"
-
-# DAGs configuration - use persistent volume
-dags:
-  persistence:
+  logGroomerSidecar:
     enabled: true
-    size: 1Gi
-    accessMode: ReadWriteOnce
 
-# Logs configuration
-logs:
-  persistence:
-    enabled: true
-    size: 2Gi
-
-# Extra environment variables for Keycloak Auth Manager
+# Extra environment variables for Keycloak Auth Manager and MinIO remote logging
+# _PIP_ADDITIONAL_REQUIREMENTS installs packages at container startup
 extraEnv: |
+  - name: _PIP_ADDITIONAL_REQUIREMENTS
+    value: "apache-airflow-providers-keycloak>=0.4.0 apache-airflow-providers-amazon>=8.0.0"
   - name: AIRFLOW__CORE__AUTH_MANAGER
     value: "airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager"
   - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID
@@ -85,9 +93,21 @@ extraEnv: |
   - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM
     value: "vault"
   - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL
-    value: "http://keycloak-service.operators.svc.cluster.local:8080"
+    value: "http://keycloak.local:8080"
   - name: AIRFLOW__WEBSERVER__BASE_URL
     value: "http://localhost:8085"
+  # Remote logging to MinIO
+  - name: AIRFLOW__LOGGING__REMOTE_LOGGING
+    value: "True"
+  - name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER
+    value: "s3://airflow-logs"
+  - name: AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID
+    value: "minio_logs"
+  - name: AIRFLOW__LOGGING__ENCRYPT_S3_LOGS
+    value: "False"
+  # MinIO connection for S3 logging (endpoint URL for MinIO)
+  - name: AIRFLOW_CONN_MINIO_LOGS
+    value: "aws://minio:minio123@?endpoint_url=https%3A%2F%2Fminio.minio.svc.cluster.local&verify=false"
 
 # Ingress (disabled - using port-forward for local access)
 ingress:
@@ -97,10 +117,6 @@ ingress:
 # Enable git-sync for DAGs (optional)
 gitSync:
   enabled: false
-
-# Create default connections/pools/variables
-createUserJob:
-  useHelmHooks: false
 
 migrateDatabaseJob:
   useHelmHooks: false

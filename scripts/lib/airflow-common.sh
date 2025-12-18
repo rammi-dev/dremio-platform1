@@ -228,13 +228,38 @@ deploy_airflow() {
     --from-literal=client-secret="${CLIENT_SECRET}" \
     -n airflow --dry-run=client -o yaml | kubectl apply -f -
   
-  # Deploy Airflow
+  # Create MinIO connection secret for remote logging
+  # Get MinIO credentials
+  MINIO_ACCESS_KEY=$(kubectl get secret minio-env-configuration -n minio -o jsonpath='{.data.config\.env}' 2>/dev/null | base64 -d | grep "MINIO_ROOT_USER" | cut -d'=' -f2 || echo "minio")
+  MINIO_SECRET_KEY=$(kubectl get secret minio-env-configuration -n minio -o jsonpath='{.data.config\.env}' 2>/dev/null | base64 -d | grep "MINIO_ROOT_PASSWORD" | cut -d'=' -f2 || echo "minio123")
+  
+  # Create MinIO connection for Airflow (URI format: s3://access_key:secret_key@/?host=endpoint)
+  MINIO_CONN_URI="aws://${MINIO_ACCESS_KEY}:${MINIO_SECRET_KEY}@?endpoint_url=https%3A%2F%2Fminio.minio.svc.cluster.local"
+  
+  kubectl create secret generic airflow-minio-connection \
+    --from-literal=connection="${MINIO_CONN_URI}" \
+    -n airflow --dry-run=client -o yaml | kubectl apply -f -
+  
+  # Get Keycloak ClusterIP dynamically for hostAliases
+  KEYCLOAK_CLUSTER_IP=$(kubectl get svc keycloak-service -n operators -o jsonpath='{.spec.clusterIP}')
+  echo "  Using Keycloak ClusterIP: ${KEYCLOAK_CLUSTER_IP}"
+  
+  # Deploy Airflow with dynamic hostAliases for keycloak.local resolution
+  # Each component needs hostAliases set separately
   if helm status airflow -n airflow > /dev/null 2>&1; then
     echo "Upgrading existing Airflow deployment..."
     helm upgrade airflow apache-airflow/airflow \
       -n airflow \
       -f helm/airflow/values.yaml \
       --set keycloakClientSecret="${CLIENT_SECRET}" \
+      --set "apiServer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "apiServer.hostAliases[0].hostnames[0]=keycloak.local" \
+      --set "scheduler.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "scheduler.hostAliases[0].hostnames[0]=keycloak.local" \
+      --set "triggerer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "triggerer.hostAliases[0].hostnames[0]=keycloak.local" \
+      --set "dagProcessor.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "dagProcessor.hostAliases[0].hostnames[0]=keycloak.local" \
       --timeout 10m
   else
     echo "Installing Airflow..."
@@ -242,24 +267,63 @@ deploy_airflow() {
       -n airflow \
       -f helm/airflow/values.yaml \
       --set keycloakClientSecret="${CLIENT_SECRET}" \
+      --set "apiServer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "apiServer.hostAliases[0].hostnames[0]=keycloak.local" \
+      --set "scheduler.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "scheduler.hostAliases[0].hostnames[0]=keycloak.local" \
+      --set "triggerer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "triggerer.hostAliases[0].hostnames[0]=keycloak.local" \
+      --set "dagProcessor.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+      --set "dagProcessor.hostAliases[0].hostnames[0]=keycloak.local" \
       --timeout 10m
   fi
   
   echo "✓ Airflow deployment initiated"
 }
 
+# Function to create MinIO bucket for Airflow logs
+create_airflow_logs_bucket() {
+  echo "Creating MinIO bucket for Airflow logs..."
+  
+  # Check if MinIO is available
+  if ! kubectl get svc minio -n minio > /dev/null 2>&1; then
+    echo "WARNING: MinIO not found. Remote logging to MinIO will not work."
+    return 0
+  fi
+  
+  # Get MinIO credentials
+  MINIO_ACCESS_KEY=$(kubectl get secret minio-env-configuration -n minio -o jsonpath='{.data.config\.env}' 2>/dev/null | base64 -d | grep "MINIO_ROOT_USER" | cut -d'=' -f2 || echo "minio")
+  MINIO_SECRET_KEY=$(kubectl get secret minio-env-configuration -n minio -o jsonpath='{.data.config\.env}' 2>/dev/null | base64 -d | grep "MINIO_ROOT_PASSWORD" | cut -d'=' -f2 || echo "minio123")
+  
+  # Use a temporary pod to create the bucket via mc (MinIO client)
+  kubectl run minio-bucket-creator -n minio --rm -i --restart=Never \
+    --image=minio/mc:latest \
+    --command -- /bin/sh -c "
+      mc alias set myminio https://minio.minio.svc.cluster.local ${MINIO_ACCESS_KEY} ${MINIO_SECRET_KEY} --insecure && \
+      mc mb myminio/airflow-logs --ignore-existing --insecure && \
+      echo 'Bucket airflow-logs created or already exists'
+    " 2>/dev/null || echo "Note: Bucket creation may have already succeeded"
+  
+  echo "✓ MinIO bucket 'airflow-logs' ready"
+}
+
 # Function to wait for Airflow to be ready
 wait_for_airflow_ready() {
   echo "Waiting for Airflow to be ready..."
   
-  # Wait for webserver
-  echo "  Waiting for webserver..."
-  kubectl wait --for=condition=available deployment/airflow-webserver \
+  # Wait for api-server (Airflow 3.0 uses api-server instead of webserver)
+  echo "  Waiting for API server..."
+  kubectl wait --for=condition=available deployment/airflow-api-server \
     -n airflow --timeout=300s 2>/dev/null || true
   
-  # Wait for scheduler
+  # Wait for scheduler (statefulset in Airflow 3.0)
   echo "  Waiting for scheduler..."
-  kubectl wait --for=condition=available deployment/airflow-scheduler \
+  kubectl rollout status statefulset/airflow-scheduler \
+    -n airflow --timeout=300s 2>/dev/null || true
+  
+  # Wait for dag-processor
+  echo "  Waiting for DAG processor..."
+  kubectl wait --for=condition=available deployment/airflow-dag-processor \
     -n airflow --timeout=300s 2>/dev/null || true
   
   # Check pod status
@@ -270,23 +334,56 @@ wait_for_airflow_ready() {
 }
 
 # Function to initialize Keycloak permissions
+# Creates scopes, resources, and permissions in Keycloak for Airflow RBAC
 initialize_airflow_permissions() {
   echo ""
   echo "========================================="
   echo "Airflow Keycloak Permissions Setup"
   echo "========================================="
   echo ""
-  echo "After Airflow is running, execute the following command to"
-  echo "initialize Keycloak permissions for Airflow:"
+  
+  # Get master realm admin credentials from Keycloak secret
+  # The Keycloak operator creates a temp-admin user in master realm
+  MASTER_USER=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d)
+  MASTER_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
+  
+  if [ -z "$MASTER_USER" ] || [ -z "$MASTER_PASS" ]; then
+    echo "WARNING: Could not get Keycloak master admin credentials."
+    echo "Manual setup required. Run:"
+    echo "  kubectl exec -it deploy/airflow-api-server -n airflow -- \\"
+    echo "    airflow keycloak-auth-manager create-all \\"
+    echo "      --username <admin> --password <password> --user-realm master"
+    return 1
+  fi
+  
+  echo "Creating Keycloak authorization scopes, resources, and permissions..."
+  echo "  Using master realm admin: ${MASTER_USER}"
+  
+  # Wait a bit for Airflow to fully initialize
+  sleep 10
+  
+  # Run the create-all command using master realm admin
+  # The master realm admin has full access to manage all realms
+  if kubectl exec -it deployment/airflow-api-server -n airflow -- \
+    airflow keycloak-auth-manager create-all \
+      --username "${MASTER_USER}" \
+      --password "${MASTER_PASS}" \
+      --user-realm master 2>&1; then
+    echo "✓ Keycloak permissions created successfully"
+  else
+    echo "WARNING: Failed to create Keycloak permissions."
+    echo "You may need to run manually:"
+    echo "  kubectl exec -it deploy/airflow-api-server -n airflow -- \\"
+    echo "    airflow keycloak-auth-manager create-all \\"
+    echo "      --username ${MASTER_USER} --password <password> --user-realm master"
+    return 1
+  fi
+  
   echo ""
-  echo "  kubectl exec -it deploy/airflow-webserver -n airflow -- \\"
-  echo "    airflow keycloak-auth-manager create-all \\"
-  echo "      --username admin \\"
-  echo "      --password admin \\"
-  echo "      --user-realm vault"
-  echo ""
-  echo "This will create the necessary scopes, resources, and permissions"
-  echo "in Keycloak for Airflow RBAC."
+  echo "Authorization configuration complete:"
+  echo "  - Scopes: GET, POST, PUT, DELETE, MENU, LIST"
+  echo "  - Resources: Dag, Connection, Variable, Pool, etc."
+  echo "  - Permissions: ReadOnly, Admin, User, Op"
   echo ""
 }
 
@@ -299,7 +396,8 @@ start_airflow_port_forward() {
   sleep 1
   
   # Start new port-forward (using 8085 to avoid conflict with Keycloak on 8080)
-  kubectl port-forward svc/airflow-webserver -n airflow 8085:8080 > /dev/null 2>&1 &
+  # Airflow 3.0 uses airflow-api-server instead of airflow-webserver
+  kubectl port-forward svc/airflow-api-server -n airflow 8085:8080 > /dev/null 2>&1 &
   
   sleep 3
   echo "✓ Port-forward started: http://localhost:8085"
@@ -315,17 +413,13 @@ print_airflow_completion() {
   echo "Access URLs:"
   echo "  Airflow UI: http://localhost:8085"
   echo ""
-  echo "Default Credentials (before Keycloak setup):"
-  echo "  Username: admin"
-  echo "  Password: admin"
-  echo ""
-  echo "Keycloak Users (after permissions setup):"
+  echo "Keycloak Users:"
   echo "  ┌─────────────────┬──────────────────┬────────────────┐"
-  echo "  │ User            │ Group            │ Airflow Role   │"
+  echo "  │ User            │ Password         │ Airflow Role   │"
   echo "  ├─────────────────┼──────────────────┼────────────────┤"
-  echo "  │ admin           │ airflow-admin    │ Admin          │"
-  echo "  │ jupyter-admin   │ data-engineers   │ Editor         │"
-  echo "  │ jupyter-ds      │ data-scientists  │ Viewer         │"
+  echo "  │ admin           │ admin            │ Admin          │"
+  echo "  │ jupyter-admin   │ password123      │ Editor         │"
+  echo "  │ jupyter-ds      │ password123      │ Viewer         │"
   echo "  └─────────────────┴──────────────────┴────────────────┘"
   echo ""
   echo "Role Permissions:"
@@ -333,9 +427,12 @@ print_airflow_completion() {
   echo "  Editor: Create/edit/execute DAGs, view logs"
   echo "  Viewer: Read-only access to DAGs and logs"
   echo ""
-  echo "Next Steps:"
-  echo "  1. Access Airflow UI at http://localhost:8085"
-  echo "  2. Run permissions setup (see command above)"
-  echo "  3. Login with Keycloak credentials"
+  echo "IMPORTANT - Local Development (WSL/Windows):"
+  echo "  Add to Windows hosts file (C:\\Windows\\System32\\drivers\\etc\\hosts):"
+  echo "    127.0.0.1  keycloak.local"
+  echo ""
+  echo "  Required port-forwards:"
+  echo "    kubectl port-forward svc/keycloak-service -n operators 8080:8080 --address 0.0.0.0"
+  echo "    kubectl port-forward svc/airflow-api-server -n airflow 8085:8080"
   echo ""
 }

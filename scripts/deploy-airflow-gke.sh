@@ -56,16 +56,21 @@ echo "Step 3: Deploying Airflow..."
 deploy_airflow "$AIRFLOW_CLIENT_SECRET"
 echo ""
 
-# Step 4: Wait for Airflow to be ready
-echo "Step 4: Waiting for Airflow to be ready..."
+# Step 4: Create MinIO bucket for logs
+echo "Step 4: Creating MinIO bucket for Airflow logs..."
+create_airflow_logs_bucket
+echo ""
+
+# Step 5: Wait for Airflow to be ready
+echo "Step 5: Waiting for Airflow to be ready..."
 wait_for_airflow_ready
 echo ""
 
-# Step 5: Initialize permissions info
+# Step 6: Initialize permissions info
 initialize_airflow_permissions
 
-# Step 6: Start port-forward
-echo "Step 6: Starting port-forward..."
+# Step 7: Start port-forward
+echo "Step 7: Starting port-forward..."
 start_airflow_port_forward
 
 # Print completion message

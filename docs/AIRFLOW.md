@@ -111,17 +111,33 @@ sequenceDiagram
 ./scripts/deploy-airflow-gke.sh
 ```
 
-### Initialize Permissions
+The deployment script automatically:
+1. Creates the Airflow Keycloak client with authorization services enabled
+2. Deploys Airflow with hostAliases for Keycloak connectivity
+3. Creates MinIO bucket for remote logging
+4. **Initializes Keycloak authorization scopes, resources, and permissions**
 
-After deployment, initialize Keycloak permissions:
+### Manual Permissions Setup (if automatic setup fails)
+
+If the automatic permissions setup fails, run manually:
 
 ```bash
-kubectl exec -it deploy/airflow-webserver -n airflow -- \
+# Get master realm admin credentials
+MASTER_USER=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d)
+MASTER_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
+
+# Create authorization entities in Keycloak
+kubectl exec -it deploy/airflow-api-server -n airflow -- \
   airflow keycloak-auth-manager create-all \
-    --username admin \
-    --password admin \
-    --user-realm vault
+    --username "$MASTER_USER" \
+    --password "$MASTER_PASS" \
+    --user-realm master
 ```
+
+This creates:
+- **Scopes**: GET, POST, PUT, DELETE, MENU, LIST
+- **Resources**: Dag, Connection, Variable, Pool, Configuration, etc.
+- **Permissions**: ReadOnly, Admin, User, Op
 
 ## Configuration
 
@@ -149,7 +165,108 @@ Key environment variables:
 | `AIRFLOW__CORE__AUTH_MANAGER` | `airflow.providers.keycloak...KeycloakAuthManager` |
 | `AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID` | `airflow` |
 | `AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM` | `vault` |
-| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL` | `http://keycloak-service.operators.svc.cluster.local:8080` |
+| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL` | `http://keycloak.local:8080` |
+
+### Host Aliases Configuration
+
+Since Airflow pods need to communicate with Keycloak using a consistent hostname (`keycloak.local`), the deployment script dynamically configures `hostAliases` for each Airflow component. This adds an entry to `/etc/hosts` in each pod to resolve `keycloak.local` to the Keycloak service ClusterIP.
+
+**Why Host Aliases?**
+
+- The Keycloak Auth Manager validates JWT tokens by contacting the Keycloak server
+- Using `keycloak.local` allows consistent URLs in both Airflow config and browser redirects
+- The ClusterIP is fetched dynamically at deployment time
+
+**Configured Components:**
+
+| Component | Purpose |
+|-----------|---------|
+| `apiServer` | API server (Airflow 3.0) needs to validate auth tokens |
+| `scheduler` | Scheduler may need to validate tokens for API calls |
+| `triggerer` | Triggerer for async task execution |
+| `dagProcessor` | DAG processor for parsing DAG files |
+
+**Deployment Script Configuration:**
+
+The [deploy script](../scripts/lib/airflow-common.sh) dynamically sets host aliases:
+
+```bash
+# Get Keycloak ClusterIP dynamically
+KEYCLOAK_CLUSTER_IP=$(kubectl get svc keycloak-service -n operators -o jsonpath='{.spec.clusterIP}')
+
+# Set hostAliases for each component
+helm install airflow apache-airflow/airflow \
+  --set "apiServer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+  --set "apiServer.hostAliases[0].hostnames[0]=keycloak.local" \
+  --set "scheduler.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
+  --set "scheduler.hostAliases[0].hostnames[0]=keycloak.local" \
+  # ... same for triggerer and dagProcessor
+```
+
+**Verifying Host Aliases:**
+
+```bash
+# Check /etc/hosts in a pod
+kubectl exec -it deploy/airflow-scheduler -n airflow -- cat /etc/hosts
+
+# Should show:
+# 34.118.231.20   keycloak.local
+```
+
+**Note:** These values are passed via `--set` flags during Helm install/upgrade, not in `values.yaml`, because the ClusterIP is determined at deployment time.
+
+### Local Development (WSL/Windows)
+
+When accessing Airflow from a browser on Windows (while running kubectl from WSL), you also need to add `keycloak.local` to the **Windows hosts file**. This is because:
+
+1. Airflow UI (localhost:8085) redirects to `keycloak.local:8080` for authentication
+2. Your browser runs on Windows, not inside WSL or Kubernetes
+3. Windows needs to resolve `keycloak.local` to reach the port-forwarded Keycloak service
+
+**Windows Hosts File Setup:**
+
+Edit `C:\Windows\System32\drivers\etc\hosts` (as Administrator):
+
+```
+127.0.0.1  keycloak.local
+```
+
+**Required Port Forwards:**
+
+```bash
+# Keycloak (for browser authentication)
+kubectl port-forward svc/keycloak-service -n operators 8080:8080 --address 0.0.0.0
+
+# Airflow (for UI access)
+kubectl port-forward -n airflow svc/airflow-api-server 8085:8080
+```
+
+**Authentication Flow:**
+
+```mermaid
+sequenceDiagram
+    participant Browser as Windows Browser
+    participant Airflow as Airflow (localhost:8085)
+    participant Keycloak as Keycloak (keycloak.local:8080)
+    
+    Browser->>Airflow: Access http://localhost:8085
+    Airflow->>Browser: Redirect to keycloak.local:8080/auth
+    Note over Browser: Windows resolves keycloak.local → 127.0.0.1
+    Browser->>Keycloak: Login page (via port-forward)
+    Keycloak->>Browser: Return JWT token
+    Browser->>Airflow: Access with token
+    Note over Airflow: Pod resolves keycloak.local via hostAliases
+    Airflow->>Keycloak: Validate token (internal cluster)
+    Airflow->>Browser: Authenticated response
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| "keycloak.local" not reachable | Add to Windows hosts file and ensure port-forward is running |
+| Login page shows but redirect fails | Check Keycloak client redirect URIs include `http://localhost:8085/*` |
+| Token validation fails | Verify hostAliases are set in Airflow pods |
 
 ## Example DAGs
 
