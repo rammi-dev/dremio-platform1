@@ -7,12 +7,16 @@ authenticate_keycloak() {
   
   KEYCLOAK_URL="http://localhost:8080"
   
+  # Get admin credentials from Kubernetes secret
+  KEYCLOAK_USER=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d)
+  KEYCLOAK_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
+  
   # Get admin token
-  ACCESS_TOKEN=$(curl -s -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
+  ACCESS_TOKEN=$(curl -s --connect-timeout 5 -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "client_id=admin-cli" \
-    -d "username=admin" \
-    -d "password=admin" \
+    -d "username=${KEYCLOAK_USER}" \
+    -d "password=${KEYCLOAK_PASS}" \
     -d "grant_type=password" | jq -r '.access_token')
   
   if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "null" ]; then
@@ -135,9 +139,9 @@ configure_airflow_groups() {
   # - data-engineers: DAG edit/execute permissions (Editor role)
   # - data-scientists: Read-only/viewer permissions (Viewer role)
   
-  local GROUPS=("airflow-admin" "data-engineers" "data-scientists")
+  local AIRFLOW_GROUPS=("airflow-admin" "data-engineers" "data-scientists")
   
-  for GROUP in "${GROUPS[@]}"; do
+  for GROUP in "${AIRFLOW_GROUPS[@]}"; do
     EXISTING=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/${REALM}/groups" \
       -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq -r ".[] | select(.name == \"${GROUP}\") | .id")
     

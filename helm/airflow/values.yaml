@@ -2,22 +2,18 @@
 # Standalone deployment with PostgreSQL + LocalExecutor
 # Integrated with Keycloak for authentication via Keycloak Auth Manager
 
-# Use official Apache Airflow image with Keycloak provider
-images:
-  airflow:
-    repository: apache/airflow
-    tag: 2.10.3-python3.11
-
 # Executor: LocalExecutor for standalone testing
 executor: "LocalExecutor"
 
-# Disable distributed components (Celery, etc.)
+# Disable Celery workers (not needed for LocalExecutor)
 workers:
-  enabled: false
+  replicas: 0
 
+# Disable Flower (Celery monitoring)
 flower:
   enabled: false
 
+# Enable triggerer for async operations
 triggerer:
   enabled: true
   replicas: 1
@@ -25,14 +21,6 @@ triggerer:
 # PostgreSQL database configuration
 postgresql:
   enabled: true
-  auth:
-    username: airflow
-    password: airflow
-    database: airflow
-  primary:
-    persistence:
-      enabled: true
-      size: 2Gi
 
 # Redis (disabled for LocalExecutor)
 redis:
@@ -49,7 +37,7 @@ webserver:
       memory: "2Gi"
       cpu: "1000m"
   
-  # Default admin user (will be overridden by Keycloak auth)
+  # Default admin user (fallback before Keycloak auth is initialized)
   defaultUser:
     enabled: true
     role: Admin
@@ -83,71 +71,44 @@ logs:
     enabled: true
     size: 2Gi
 
-# Environment variables for Keycloak Auth Manager
-env:
-  # Core auth manager configuration
-  - name: "AIRFLOW__CORE__AUTH_MANAGER"
+# Extra environment variables for Keycloak Auth Manager
+extraEnv: |
+  - name: AIRFLOW__CORE__AUTH_MANAGER
     value: "airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager"
-  # Keycloak Auth Manager configuration
-  - name: "AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID
     value: "airflow"
-  - name: "AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET
     valueFrom:
       secretKeyRef:
         name: airflow-keycloak-secret
         key: client-secret
-  - name: "AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM
     value: "vault"
-  - name: "AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL
     value: "http://keycloak-service.operators.svc.cluster.local:8080"
-  # Webserver configuration for login
-  - name: "AIRFLOW__WEBSERVER__BASE_URL"
-    value: "http://localhost:8080"
-
-# Extra pip packages - install Keycloak provider
-extraPipPackages:
-  - apache-airflow-providers-keycloak>=0.4.0
-
-# Service configuration
-service:
-  type: ClusterIP
-  ports:
-    - name: airflow-ui
-      port: 8080
-      targetPort: 8080
+  - name: AIRFLOW__WEBSERVER__BASE_URL
+    value: "http://localhost:8085"
 
 # Ingress (disabled - using port-forward for local access)
 ingress:
-  enabled: false
+  web:
+    enabled: false
 
 # Enable git-sync for DAGs (optional)
 gitSync:
   enabled: false
 
-# Extra secrets for Keycloak client secret
-extraSecrets:
-  airflow-keycloak-secret:
-    data: |
-      client-secret: "{{ .Values.keycloakClientSecret | default "airflow-secret" | b64enc }}"
+# Create default connections/pools/variables
+createUserJob:
+  useHelmHooks: false
 
-# Custom values for Keycloak integration
-keycloakClientSecret: "airflow-secret"
-
-# ConfigMap for additional Airflow config
-extraConfigMaps: {}
-
-# RBAC and ServiceAccount
-serviceAccount:
-  create: true
-  name: "airflow"
-
-rbac:
-  create: true
+migrateDatabaseJob:
+  useHelmHooks: false
 
 # Security context
-securityContext:
-  runAsUser: 50000
-  fsGroup: 50000
-
-# Pod priority
-priorityClassName: ""
+securityContexts:
+  pod:
+    runAsUser: 50000
+    fsGroup: 0
+  container:
+    runAsUser: 50000
