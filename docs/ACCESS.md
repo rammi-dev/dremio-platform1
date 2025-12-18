@@ -12,6 +12,7 @@ This document details all access credentials, authentication methods, and author
 | Vault | http://localhost:8200 | OIDC or Token |
 | MinIO Console | https://localhost:9091 | "Login with OpenID" |
 | JupyterHub | http://localhost:8000 | "Sign in with Keycloak" |
+| Airflow | http://localhost:8085 | Keycloak Auth Manager |
 | Dremio | http://localhost:9047 | OIDC (when configured) |
 
 ---
@@ -61,6 +62,7 @@ Password: admin
 | `vault` | Vault UI OIDC | Standard Flow + Direct Access |
 | `minio` | MinIO Console + STS | Standard Flow + Direct Access |
 | `jupyterhub` | JupyterHub OAuth | Standard Flow |
+| `airflow` | Airflow Keycloak Auth Manager | Standard Flow + Authorization Services |
 | `dremio` | Dremio (future) | Standard Flow |
 
 ### Groups
@@ -70,6 +72,9 @@ Password: admin
 | `vault-admins` | admin | Full Vault access |
 | `minio-access` | admin | MinIO bucket access |
 | `jupyterhub` | admin | JupyterHub access |
+| `airflow-admin` | admin | Full Airflow admin access |
+| `data-engineers` | jupyter-admin | Airflow Editor role |
+| `data-scientists` | jupyter-ds | Airflow Viewer role |
 
 ### Creating New Users
 
@@ -231,6 +236,52 @@ JupyterHub admins can:
 - View all user servers
 - Stop/start user servers
 - Access admin panel at `/hub/admin`
+
+---
+
+## Airflow
+
+### Authentication
+
+Airflow uses the Keycloak Auth Manager for authentication:
+
+1. Go to http://localhost:8085
+2. You will be redirected to Keycloak login
+3. Login with Keycloak credentials
+
+### Role-Based Access
+
+| Keycloak Group | Airflow Role | Permissions |
+|----------------|--------------|-------------|
+| `airflow-admin` | Admin | Full admin access |
+| `data-engineers` | Editor | Create/edit/execute DAGs |
+| `data-scientists` | Viewer | Read-only access |
+
+### User Assignments
+
+| User | Password | Airflow Role |
+|------|----------|--------------|
+| `admin` | admin | Admin |
+| `jupyter-admin` | password123 | Editor |
+| `jupyter-ds` | password123 | Viewer |
+
+### Initializing Permissions
+
+After deployment, initialize Keycloak permissions:
+
+```bash
+kubectl exec -it deploy/airflow-webserver -n airflow -- \
+  airflow keycloak-auth-manager create-all \
+    --username admin \
+    --password admin \
+    --user-realm vault
+```
+
+### Port Forward
+
+```bash
+kubectl port-forward svc/airflow-webserver -n airflow 8085:8080
+```
 
 ---
 

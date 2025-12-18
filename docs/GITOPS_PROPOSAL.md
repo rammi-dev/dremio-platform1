@@ -25,6 +25,7 @@ graph TB
         M[MinIO App]
         JH[JupyterHub App]
         S[Spark App]
+        AF[Airflow App]
         D[Dremio App]
     end
     
@@ -38,6 +39,7 @@ graph TB
     AppOfApps --> M
     AppOfApps --> JH
     AppOfApps --> S
+    AppOfApps --> AF
     AppOfApps --> D
     ArgoCD -->|Deploy| Resources
 ```
@@ -54,6 +56,7 @@ graph TB
 │   ├── minio.yaml
 │   ├── jupyterhub.yaml
 │   ├── spark.yaml
+│   ├── airflow.yaml
 │   └── dremio.yaml
 │
 ├── base/                      # Base Kustomize configurations
@@ -79,6 +82,9 @@ graph TB
 │   ├── spark/
 │   │   ├── kustomization.yaml
 │   │   └── operator.yaml
+│   ├── airflow/
+│   │   ├── kustomization.yaml
+│   │   └── values.yaml
 │   └── dremio/
 │       ├── kustomization.yaml
 │       └── values.yaml
