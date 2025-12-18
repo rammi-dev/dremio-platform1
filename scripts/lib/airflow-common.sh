@@ -61,13 +61,19 @@ configure_airflow_keycloak_client() {
   "serviceAccountsEnabled": true,
   "authorizationServicesEnabled": true,
   "publicClient": false,
+  "frontchannelLogout": false,
+  "rootUrl": "http://localhost:8085",
+  "baseUrl": "http://localhost:8085/",
   "redirectUris": [
-    "http://localhost:8080/*",
-    "http://airflow.local:8080/*"
+    "http://localhost:8085/*"
   ],
   "webOrigins": [
     "+"
   ],
+  "attributes": {
+    "post.logout.redirect.uris": "http://localhost:8085/*",
+    "backchannel.logout.session.required": "true"
+  },
   "protocolMappers": [
     {
       "name": "groups-mapper",
@@ -124,6 +130,28 @@ EOF
   fi
   
   export AIRFLOW_CLIENT_SECRET="airflow-secret"
+}
+
+# Function to delete Airflow Keycloak client (for clean reinstall)
+delete_airflow_keycloak_client() {
+  local KEYCLOAK_URL="http://localhost:8080"
+  local REALM="vault"
+  
+  # Authenticate if not already done
+  if [ -z "$ACCESS_TOKEN" ]; then
+    authenticate_keycloak
+  fi
+  
+  # Get client ID
+  local CLIENT_UUID=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" | jq -r '.[] | select(.clientId == "airflow") | .id')
+  
+  if [ -n "$CLIENT_UUID" ] && [ "$CLIENT_UUID" != "null" ]; then
+    curl -s -X DELETE "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}" \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}"
+    echo "  Deleted Airflow client from Keycloak"
+  fi
 }
 
 # Function to create Airflow-specific groups in Keycloak
@@ -257,8 +285,38 @@ deploy_airflow() {
   KEYCLOAK_CLUSTER_IP=$(kubectl get svc keycloak-service -n operators -o jsonpath='{.spec.clusterIP}')
   echo "  Using Keycloak ClusterIP: ${KEYCLOAK_CLUSTER_IP}"
   
+  # Create a headless Service + Endpoints to resolve keycloak.local within the airflow namespace
+  # This is needed because dagProcessor doesn't support hostAliases
+  # We create a service named "keycloak" in the airflow namespace pointing to Keycloak's ClusterIP
+  cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: airflow
+spec:
+  clusterIP: None
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: keycloak
+  namespace: airflow
+subsets:
+  - addresses:
+      - ip: ${KEYCLOAK_CLUSTER_IP}
+    ports:
+      - port: 8080
+        name: http
+EOF
+  echo "  Created keycloak service/endpoints in airflow namespace"
+  
   # Deploy Airflow with dynamic hostAliases for keycloak.local resolution
-  # Each component needs hostAliases set separately
+  # Each component needs hostAliases set separately (dagProcessor doesn't support it)
   if helm status airflow -n airflow > /dev/null 2>&1; then
     echo "Upgrading existing Airflow deployment..."
     helm upgrade airflow apache-airflow/airflow \
@@ -271,8 +329,6 @@ deploy_airflow() {
       --set "scheduler.hostAliases[0].hostnames[0]=keycloak.local" \
       --set "triggerer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
       --set "triggerer.hostAliases[0].hostnames[0]=keycloak.local" \
-      --set "dagProcessor.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
-      --set "dagProcessor.hostAliases[0].hostnames[0]=keycloak.local" \
       --timeout 10m
   else
     echo "Installing Airflow..."
@@ -286,8 +342,6 @@ deploy_airflow() {
       --set "scheduler.hostAliases[0].hostnames[0]=keycloak.local" \
       --set "triggerer.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
       --set "triggerer.hostAliases[0].hostnames[0]=keycloak.local" \
-      --set "dagProcessor.hostAliases[0].ip=${KEYCLOAK_CLUSTER_IP}" \
-      --set "dagProcessor.hostAliases[0].hostnames[0]=keycloak.local" \
       --timeout 10m
   fi
   
@@ -630,6 +684,50 @@ configure_airflow_authorization_policies() {
   echo ""
 }
 
+# Function to clear all Keycloak user sessions in vault realm
+# This prevents SSO auto-login issues when testing different users
+clear_keycloak_sessions() {
+  local ACCESS_TOKEN="$1"
+  local KEYCLOAK_URL="http://localhost:8080"
+  local REALM="vault"
+  
+  echo "Clearing Keycloak SSO sessions in ${REALM} realm..."
+  
+  # Get all users in the vault realm
+  local USERS=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/${REALM}/users?max=100" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json")
+  
+  if [ -z "$USERS" ] || [ "$USERS" == "[]" ]; then
+    echo "  No users found in ${REALM} realm"
+    return 0
+  fi
+  
+  local CLEARED=0
+  for USER_ID in $(echo "$USERS" | jq -r '.[].id'); do
+    local USERNAME=$(echo "$USERS" | jq -r ".[] | select(.id==\"${USER_ID}\") | .username")
+    
+    # Get session count for this user
+    local SESSION_COUNT=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/${REALM}/users/${USER_ID}/sessions" \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq 'length')
+    
+    if [ "$SESSION_COUNT" -gt 0 ] 2>/dev/null; then
+      # Terminate all sessions for this user
+      curl -s -X POST "${KEYCLOAK_URL}/admin/realms/${REALM}/users/${USER_ID}/logout" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}"
+      echo "  Cleared ${SESSION_COUNT} session(s) for user: ${USERNAME}"
+      CLEARED=$((CLEARED + SESSION_COUNT))
+    fi
+  done
+  
+  if [ "$CLEARED" -gt 0 ]; then
+    echo "✓ Cleared ${CLEARED} total Keycloak SSO session(s)"
+  else
+    echo "✓ No active sessions to clear"
+  fi
+  echo ""
+}
+
 # Function to start port-forward
 start_airflow_port_forward() {
   echo "Starting port-forward for Airflow..."
@@ -672,10 +770,12 @@ print_airflow_completion() {
   echo ""
   echo "IMPORTANT - Local Development (WSL/Windows):"
   echo "  Add to Windows hosts file (C:\\Windows\\System32\\drivers\\etc\\hosts):"
-  echo "    127.0.0.1  keycloak.local"
+  echo "    127.0.0.1  keycloak"
   echo ""
   echo "  Required port-forwards:"
   echo "    kubectl port-forward svc/keycloak-service -n operators 8080:8080 --address 0.0.0.0"
   echo "    kubectl port-forward svc/airflow-api-server -n airflow 8085:8080"
   echo ""
-}
+  echo "Logout URL (use this to fully logout and switch users):"
+  echo "  http://keycloak:8080/realms/vault/protocol/openid-connect/logout?client_id=airflow&post_logout_redirect_uri=http://localhost:8085/"
+  echo ""

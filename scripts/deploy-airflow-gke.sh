@@ -17,6 +17,56 @@ echo "Apache Airflow Deployment (Add-on) - GKE"
 echo "========================================="
 echo ""
 
+# Check for --clean flag
+CLEAN_INSTALL=false
+if [[ "$1" == "--clean" ]]; then
+  CLEAN_INSTALL=true
+  echo "Clean install requested - will delete existing namespace and PVCs"
+  echo ""
+fi
+
+# Step 0: Clean existing installation if requested
+if [[ "$CLEAN_INSTALL" == "true" ]]; then
+  echo "Step 0: Cleaning existing Airflow installation..."
+  
+  # Kill existing port-forwards
+  pkill -f "kubectl port-forward.*airflow.*8085" 2>/dev/null || true
+  
+  # Delete helm release
+  if helm status airflow -n airflow &>/dev/null; then
+    echo "  Deleting Helm release..."
+    helm uninstall airflow -n airflow --wait 2>/dev/null || true
+  fi
+  
+  # Delete all resources in namespace
+  if kubectl get namespace airflow &>/dev/null; then
+    echo "  Deleting all resources in airflow namespace..."
+    kubectl delete all --all -n airflow --timeout=60s 2>/dev/null || true
+    kubectl delete pvc --all -n airflow --timeout=60s 2>/dev/null || true
+    kubectl delete secrets --all -n airflow --timeout=60s 2>/dev/null || true
+    kubectl delete configmaps --all -n airflow --timeout=60s 2>/dev/null || true
+    
+    echo "  Deleting namespace..."
+    kubectl delete namespace airflow --timeout=120s 2>/dev/null || true
+    
+    # Wait for namespace deletion
+    echo "  Waiting for namespace deletion..."
+    for i in {1..30}; do
+      if ! kubectl get namespace airflow &>/dev/null; then
+        break
+      fi
+      sleep 2
+    done
+  fi
+  
+  # Delete Keycloak client to start fresh
+  echo "  Deleting Airflow Keycloak client..."
+  delete_airflow_keycloak_client 2>/dev/null || true
+  
+  echo "✓ Clean up complete"
+  echo ""
+fi
+
 # Step 1: Verify prerequisites
 echo "Step 1: Verifying prerequisites..."
 
@@ -41,6 +91,10 @@ if ! curl -s http://localhost:8080/realms/master > /dev/null 2>&1; then
   sleep 3
 fi
 echo "✓ Keycloak accessible at localhost:8080"
+
+# Ensure Keycloak hostname is set to 'keycloak' for proper logout redirects
+echo "  Configuring Keycloak hostname..."
+kubectl patch keycloak keycloak -n operators --type='merge' -p '{"spec":{"hostname":{"hostname":"keycloak","strict":false,"strictBackchannel":false}}}' 2>/dev/null || true
 echo ""
 
 # Step 2: Configure Keycloak
@@ -76,8 +130,12 @@ echo "Step 7: Configuring authorization policies..."
 configure_airflow_authorization_policies
 echo ""
 
-# Step 8: Start port-forward
-echo "Step 8: Starting port-forward..."
+# Step 8: Clear existing Keycloak SSO sessions (prevents auto-login issues)
+echo "Step 8: Clearing Keycloak SSO sessions..."
+clear_keycloak_sessions "$ACCESS_TOKEN"
+
+# Step 9: Start port-forward
+echo "Step 9: Starting port-forward..."
 start_airflow_port_forward
 
 # Print completion message

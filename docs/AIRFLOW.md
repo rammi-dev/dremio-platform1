@@ -553,6 +553,36 @@ kubectl exec -it deploy/airflow-webserver -n airflow -- \
        --username admin --password admin --user-realm vault
    ```
 
+## Known Limitations
+
+### Logout Button Returns 401 (TODO)
+
+**Issue:** The Airflow logout button (`/auth/logout`) returns "Not authenticated" (401) when clicked, instead of properly redirecting to Keycloak's logout endpoint.
+
+**Root Cause:** The Keycloak Auth Manager's logout route requires a valid session (`Depends(get_user)`) to retrieve the `id_token` for the OIDC logout flow. When the session is expired or invalid, it returns 401 instead of gracefully redirecting to Keycloak.
+
+**Workaround:** Use the direct Keycloak logout URL:
+```
+http://keycloak:8080/realms/vault/protocol/openid-connect/logout?client_id=airflow&post_logout_redirect_uri=http://localhost:8085/
+```
+
+**TODO:** Submit a feature request/PR to Apache Airflow Keycloak provider to handle unauthenticated logout requests by redirecting directly to Keycloak's `end_session_endpoint`.
+
+**Proposed Fix:**
+```python
+# Current code in login.py:
+@login_router.get("/logout")
+def logout(request: Request, user: Annotated[KeycloakAuthManagerUser, Depends(get_user)]):
+    # Requires valid session
+
+# Should be changed to:
+@login_router.get("/logout")
+def logout(request: Request, user: Annotated[KeycloakAuthManagerUser | None, Depends(get_user_optional)]):
+    if user is None:
+        # Redirect directly to Keycloak logout without id_token_hint
+        return RedirectResponse(f"{end_session_endpoint}?client_id=airflow&post_logout_redirect_uri={redirect_uri}")
+```
+
 ## References
 
 - [Keycloak Auth Manager Documentation](https://airflow.apache.org/docs/apache-airflow-providers-keycloak/stable/auth-manager/index.html)

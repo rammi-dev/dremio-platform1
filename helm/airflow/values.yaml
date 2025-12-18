@@ -93,7 +93,7 @@ extraEnv: |
   - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM
     value: "vault"
   - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL
-    value: "http://keycloak.local:8080"
+    value: "http://keycloak:8080"
   - name: AIRFLOW__WEBSERVER__BASE_URL
     value: "http://localhost:8085"
   # Session configuration - handle token expiry gracefully
