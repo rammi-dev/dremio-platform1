@@ -187,7 +187,7 @@ spec:
         emailVerified: true
         credentials:
           - type: password
-            value: password123
+            value: jupyter-admin
             temporary: false
         groups:
           - admin
@@ -202,7 +202,7 @@ spec:
         emailVerified: true
         credentials:
           - type: password
-            value: password123
+            value: jupyter-ds
             temporary: false
         groups:
           - data-science
