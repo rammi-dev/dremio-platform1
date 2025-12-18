@@ -37,6 +37,7 @@ graph TB
     
     JH -->|STS Credentials| MinIO
     AF -->|Orchestrate| Spark
+    AF -->|dbt Jobs| Dremio
     Spark -->|S3 API| MinIO
     Dremio -->|S3 API| MinIO
     

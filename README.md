@@ -14,6 +14,7 @@ graph LR
         JH -->|STS| MinIO
         Spark[⚡ Spark] -->|S3A| MinIO
         AF -->|Orchestrate| Spark
+        AF -->|dbt| Dremio
         Dremio -->|S3| MinIO
     end
 ```
@@ -98,6 +99,7 @@ graph TB
     
     JH -->|STS Credentials| MinIO
     AF -->|Orchestrate| Spark
+    AF -->|dbt Jobs| Dremio
     Spark -->|S3A| MinIO
     Dremio -->|S3| MinIO
     
