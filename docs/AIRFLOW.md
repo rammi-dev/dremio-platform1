@@ -92,11 +92,11 @@ sequenceDiagram
 
 ### User Assignments
 
-| User | Password | Groups | Airflow Role |
+| User | Password | Groups | Access Level |
 |------|----------|--------|--------------|
-| `admin` | admin | airflow-admin, admin | Admin |
-| `jupyter-admin` | password123 | data-engineers | Editor |
-| `jupyter-ds` | password123 | data-scientists | Viewer |
+| `admin` | admin | airflow-admin, admin | Admin (full access) |
+| `jupyter-admin` | jupyter-admin | data-engineers | User (editor) |
+| `jupyter-ds` | jupyter-ds | data-scientists | ReadOnly (viewer) |
 
 ## Deployment
 
@@ -283,14 +283,67 @@ redirectUris:
 
 ### Airflow Configuration
 
-Key environment variables:
+Key environment variables configured in [values.yaml](../helm/airflow/values.yaml):
 
-| Variable | Value |
-|----------|-------|
-| `AIRFLOW__CORE__AUTH_MANAGER` | `airflow.providers.keycloak...KeycloakAuthManager` |
-| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID` | `airflow` |
-| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM` | `vault` |
-| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL` | `http://keycloak.local:8080` |
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `AIRFLOW__CORE__AUTH_MANAGER` | `airflow.providers.keycloak...KeycloakAuthManager` | Use Keycloak for authentication |
+| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID` | `airflow` | Keycloak client ID |
+| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET` | (from secret) | Client secret for token exchange |
+| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM` | `vault` | Keycloak realm name |
+| `AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL` | `http://keycloak.local:8080` | Keycloak server URL |
+| `AIRFLOW__WEBSERVER__BASE_URL` | `http://localhost:8085` | Airflow base URL for redirects |
+| `AIRFLOW__WEBSERVER__SESSION_LIFETIME_MINUTES` | `30` | Browser session lifetime |
+
+## Session & Token Configuration
+
+### Token Lifespans (Keycloak Realm)
+
+To prevent frequent 500 errors due to token expiry, the deployment script configures extended token lifespans:
+
+| Setting | Default | Configured | Description |
+|---------|---------|------------|-------------|
+| `accessTokenLifespan` | 300s (5min) | 3600s (1hr) | How long access tokens are valid |
+| `ssoSessionIdleTimeout` | 1800s (30min) | 7200s (2hr) | Session timeout when idle |
+| `ssoSessionMaxLifespan` | 36000s (10hr) | 86400s (24hr) | Maximum session duration |
+
+**Why These Settings Matter:**
+
+The Keycloak Auth Manager validates tokens on every request. If the token expires mid-session, users see a **500 Internal Server Error** instead of being redirected to login. Longer token lifespans reduce this friction.
+
+**Configuration Location:**
+
+1. **Runtime** - Set via Keycloak Admin API (done by deployment script):
+   ```bash
+   curl -X PUT "http://localhost:8080/admin/realms/vault" \
+     -H "Authorization: Bearer $TOKEN" \
+     -d '{"accessTokenLifespan": 3600, "ssoSessionIdleTimeout": 7200, "ssoSessionMaxLifespan": 86400}'
+   ```
+
+2. **Realm Import** - Configured in [keycloak-realm-import.yaml](../helm/keycloak/manifests/keycloak-realm-import.yaml):
+   ```yaml
+   realm:
+     accessTokenLifespan: 3600
+     ssoSessionIdleTimeout: 7200
+     ssoSessionMaxLifespan: 86400
+   ```
+
+### Session Handling
+
+| Component | Session Storage | Lifetime |
+|-----------|-----------------|----------|
+| Keycloak SSO | Server-side | 24 hours max |
+| Airflow Browser | Cookie | 30 minutes |
+| Access Token | JWT (stateless) | 1 hour |
+| Refresh Token | Server-side | 30 days |
+
+**Troubleshooting Token Expiry:**
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| 500 error after idle | Access token expired | Clear cookies, re-login |
+| 401 Invalid bearer token | Token validation failed | Check Keycloak connectivity |
+| Redirect loop | Session cookie invalid | Clear all cookies for both domains |
 
 ### Host Aliases Configuration
 
@@ -505,3 +558,171 @@ kubectl exec -it deploy/airflow-webserver -n airflow -- \
 - [Keycloak Auth Manager Documentation](https://airflow.apache.org/docs/apache-airflow-providers-keycloak/stable/auth-manager/index.html)
 - [Airflow Helm Chart](https://airflow.apache.org/docs/helm-chart/stable/index.html)
 - [SparkKubernetesOperator](https://airflow.apache.org/docs/apache-airflow-providers-cncf-kubernetes/stable/operators.html)
+
+---
+
+## Appendix: Complete Configuration Reference
+
+### A. Keycloak Groups
+
+| Group | Purpose | Linked Permission |
+|-------|---------|-------------------|
+| `airflow-admin` | Full administrative access | Admin |
+| `data-engineers` | DAG development and execution | User |
+| `data-scientists` | Read-only viewing | ReadOnly |
+
+### B. Authorization Scopes
+
+| Scope | HTTP Method | Operations |
+|-------|-------------|------------|
+| `GET` | GET | View single resource |
+| `LIST` | GET | List multiple resources |
+| `POST` | POST | Create new resource |
+| `PUT` | PUT/PATCH | Update existing resource |
+| `DELETE` | DELETE | Remove resource |
+| `MENU` | - | Access UI menu items |
+
+### C. Authorization Resources
+
+Resources created by `airflow keycloak-auth-manager create-all`:
+
+| Resource | Description | Common Scopes |
+|----------|-------------|---------------|
+| `Dag` | Individual DAG | GET, POST, PUT, DELETE, LIST |
+| `Dags` | DAG collection | MENU |
+| `Connection` | Single connection | GET, POST, PUT, DELETE |
+| `Connections` | Connection collection | MENU, LIST |
+| `Variable` | Single variable | GET, POST, PUT, DELETE |
+| `Variables` | Variable collection | MENU, LIST |
+| `Pool` | Worker pool | GET, POST, PUT, DELETE |
+| `Pools` | Pool collection | MENU, LIST |
+| `Configuration` | Airflow config | GET |
+| `Config` | Config endpoint | GET, LIST |
+| `Asset` | Data asset | GET, POST, PUT, DELETE |
+| `Assets` | Asset collection | MENU |
+| `AssetAlias` | Asset alias | GET, POST, PUT, DELETE |
+| `Backfill` | Backfill job | GET, POST, PUT, DELETE |
+| `View` | UI views | GET, LIST |
+| `Menu` | Menu items | GET, MENU |
+| `Docs` | Documentation | GET |
+| `Plugins` | Plugins info | GET |
+| `Providers` | Provider info | GET, LIST |
+| `XComs` | XCom values | GET, LIST |
+| `Audit Log` | Audit entries | GET, LIST |
+| `Custom` | Custom endpoints | GET |
+
+### D. Authorization Permissions
+
+| Permission | Type | Scopes | Resources |
+|------------|------|--------|-----------|
+| `Admin` | scope-based | GET, POST, PUT, DELETE, LIST, MENU | All (22 resources) |
+| `User` | resource-based | GET, POST, PUT, DELETE, LIST | Dag, Asset |
+| `ReadOnly` | scope-based | GET, LIST, MENU | None (applies globally) |
+| `Op` | resource-based | Various | Operational resources |
+
+### E. Group Policies
+
+| Policy Name | Group | Logic | Decision Strategy |
+|-------------|-------|-------|-------------------|
+| `airflow-admin-group-policy` | airflow-admin | POSITIVE | AFFIRMATIVE |
+| `data-engineers-group-policy` | data-engineers | POSITIVE | AFFIRMATIVE |
+| `data-scientists-group-policy` | data-scientists | POSITIVE | AFFIRMATIVE |
+
+### F. Keycloak Client Configuration
+
+```yaml
+# Airflow client in Keycloak (vault realm)
+clientId: airflow
+name: Airflow
+enabled: true
+clientAuthenticatorType: client-secret
+secret: airflow-secret
+protocol: openid-connect
+
+# Authentication flows
+standardFlowEnabled: true          # Authorization code flow (browser)
+directAccessGrantsEnabled: true    # Resource owner password (CLI)
+serviceAccountsEnabled: true       # Client credentials (service)
+implicitFlowEnabled: false         # Not needed
+
+# Authorization services
+authorizationServicesEnabled: true
+authorizationSettings:
+  policyEnforcementMode: ENFORCING
+  decisionStrategy: AFFIRMATIVE    # CRITICAL: Any permission can grant access
+
+# URLs
+redirectUris:
+  - "http://localhost:8085/*"
+  - "http://airflow.local:8085/*"
+webOrigins:
+  - "http://localhost:8085"
+  - "http://airflow.local:8085"
+
+# Token mappers
+protocolMappers:
+  - name: groups
+    protocol: openid-connect
+    protocolMapper: oidc-group-membership-mapper
+    config:
+      claim.name: groups
+      full.path: "false"
+      id.token.claim: "true"
+      access.token.claim: "true"
+```
+
+### G. Token Configuration
+
+| Setting | Location | Value | Description |
+|---------|----------|-------|-------------|
+| `accessTokenLifespan` | Keycloak realm | 3600 | Access token validity (1 hour) |
+| `ssoSessionIdleTimeout` | Keycloak realm | 7200 | Idle timeout (2 hours) |
+| `ssoSessionMaxLifespan` | Keycloak realm | 86400 | Max session (24 hours) |
+| `SESSION_LIFETIME_MINUTES` | Airflow env | 30 | Browser session cookie |
+
+### H. Environment Variables
+
+Complete list of Airflow environment variables for Keycloak integration:
+
+```yaml
+extraEnv:
+  # Package installation
+  - name: _PIP_ADDITIONAL_REQUIREMENTS
+    value: "apache-airflow-providers-keycloak>=0.4.0"
+  
+  # Auth Manager
+  - name: AIRFLOW__CORE__AUTH_MANAGER
+    value: "airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager"
+  
+  # Keycloak connection
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID
+    value: "airflow"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: airflow-keycloak-secret
+        key: client-secret
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM
+    value: "vault"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL
+    value: "http://keycloak.local:8080"
+  
+  # Webserver
+  - name: AIRFLOW__WEBSERVER__BASE_URL
+    value: "http://localhost:8085"
+  - name: AIRFLOW__WEBSERVER__SESSION_LIFETIME_MINUTES
+    value: "30"
+```
+
+### I. Deployment Script Functions
+
+| Function | File | Purpose |
+|----------|------|---------|
+| `authenticate_keycloak` | airflow-common.sh | Get admin token |
+| `configure_airflow_keycloak_client` | airflow-common.sh | Create/update Airflow client |
+| `configure_airflow_groups` | airflow-common.sh | Create groups + set token lifespans |
+| `assign_airflow_groups_to_users` | airflow-common.sh | Add users to groups |
+| `deploy_airflow` | airflow-common.sh | Helm install with hostAliases |
+| `initialize_airflow_permissions` | airflow-common.sh | Run `create-all` CLI |
+| `configure_airflow_authorization_policies` | airflow-common.sh | Create group policies, set AFFIRMATIVE strategy |
+| `start_airflow_port_forward` | airflow-common.sh | Start kubectl port-forward |

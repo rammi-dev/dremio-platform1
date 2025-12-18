@@ -96,6 +96,11 @@ extraEnv: |
     value: "http://keycloak.local:8080"
   - name: AIRFLOW__WEBSERVER__BASE_URL
     value: "http://localhost:8085"
+  # Session configuration - handle token expiry gracefully
+  - name: AIRFLOW__WEBSERVER__SESSION_LIFETIME_MINUTES
+    value: "30"
+  - name: AIRFLOW__API__AUTH_BACKENDS
+    value: "airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManagerAuthenticationBackend"
   # Remote logging to MinIO
   - name: AIRFLOW__LOGGING__REMOTE_LOGGING
     value: "True"

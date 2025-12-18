@@ -134,6 +134,19 @@ configure_airflow_groups() {
   
   echo "Configuring Airflow groups in Keycloak..."
   
+  # Configure token lifespans to avoid 500 errors on expiry
+  # Default access token is only 5 minutes which causes frequent session timeouts
+  echo "  Setting token lifespans (access: 1h, idle: 2h, max: 24h)..."
+  curl -s -X PUT "${KEYCLOAK_URL}/admin/realms/${REALM}" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "accessTokenLifespan": 3600,
+      "ssoSessionIdleTimeout": 7200,
+      "ssoSessionMaxLifespan": 86400
+    }' > /dev/null
+  echo "  ✓ Token lifespans configured"
+  
   # Groups for Airflow RBAC:
   # - airflow-admin: Full admin access
   # - data-engineers: DAG edit/execute permissions (Editor role)

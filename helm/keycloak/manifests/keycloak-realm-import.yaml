@@ -10,6 +10,11 @@ spec:
     enabled: true
     displayName: Vault
     
+    # Token lifespans (to avoid frequent 500 errors on token expiry)
+    accessTokenLifespan: 3600        # 1 hour (default: 5 minutes)
+    ssoSessionIdleTimeout: 7200      # 2 hours idle timeout
+    ssoSessionMaxLifespan: 86400     # 24 hours max session
+    
     # Clients
     clients:
       - clientId: jupyterhub
