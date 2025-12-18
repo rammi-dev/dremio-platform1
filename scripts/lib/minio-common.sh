@@ -16,32 +16,41 @@ check_keycloak_status() {
 ensure_keycloak_port_forward() {
   echo "Checking Keycloak port-forward..."
   
-  # Check if port-forward is already running
-  if ps aux | grep -q "[k]ubectl port-forward -n operators svc/keycloak-service 8080"; then
-    echo "✓ Keycloak port-forward already running"
-    return 0
-  fi
-  
-  # Check if port 8080 is accessible
-  if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null | grep -q "200\|302\|401"; then
+  # Check if port 8080 is accessible (most reliable check)
+  if curl -s --connect-timeout 2 http://localhost:8080/realms/master > /dev/null 2>&1; then
     echo "✓ Keycloak accessible on localhost:8080"
     return 0
   fi
   
+  # Check if port-forward process is running (any argument order)
+  if ps aux | grep -E "[k]ubectl.*port-forward.*keycloak.*8080" > /dev/null 2>&1; then
+    echo "Port-forward process found, waiting for it to be ready..."
+    sleep 3
+    if curl -s --connect-timeout 5 http://localhost:8080/realms/master > /dev/null 2>&1; then
+      echo "✓ Keycloak port-forward ready"
+      return 0
+    fi
+  fi
+  
   # Start port-forward
   echo "Starting Keycloak port-forward..."
-  pkill -f "kubectl port-forward -n operators svc/keycloak-service" 2>/dev/null || true
+  pkill -f "kubectl.*port-forward.*keycloak" 2>/dev/null || true
+  sleep 1
   nohup kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0 > /dev/null 2>&1 &
-  sleep 3
   
-  # Verify it's working
-  if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null | grep -q "200\|302\|401"; then
-    echo "✓ Keycloak port-forward started successfully"
-  else
-    echo "ERROR: Failed to start Keycloak port-forward"
-    echo "Please run: kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0"
-    exit 1
-  fi
+  # Wait for it to be ready with retries
+  for i in {1..10}; do
+    sleep 2
+    if curl -s --connect-timeout 2 http://localhost:8080/realms/master > /dev/null 2>&1; then
+      echo "✓ Keycloak port-forward started successfully"
+      return 0
+    fi
+    echo "  Waiting for Keycloak... ($i/10)"
+  done
+  
+  echo "ERROR: Failed to start Keycloak port-forward"
+  echo "Please run: kubectl port-forward -n operators svc/keycloak-service 8080:8080"
+  exit 1
 }
 
 # Authenticate with Keycloak and get access token
