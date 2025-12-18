@@ -66,11 +66,18 @@ echo "Step 5: Waiting for Airflow to be ready..."
 wait_for_airflow_ready
 echo ""
 
-# Step 6: Initialize permissions info
+# Step 6: Initialize Keycloak authorization (scopes, resources, permissions)
+echo "Step 6: Initializing Keycloak authorization..."
 initialize_airflow_permissions
+echo ""
 
-# Step 7: Start port-forward
-echo "Step 7: Starting port-forward..."
+# Step 7: Configure authorization policies (link groups to permissions)
+echo "Step 7: Configuring authorization policies..."
+configure_airflow_authorization_policies
+echo ""
+
+# Step 8: Start port-forward
+echo "Step 8: Starting port-forward..."
 start_airflow_port_forward
 
 # Print completion message

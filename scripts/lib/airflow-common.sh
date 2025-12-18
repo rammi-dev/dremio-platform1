@@ -387,6 +387,236 @@ initialize_airflow_permissions() {
   echo ""
 }
 
+# Function to configure Keycloak authorization group policies
+# Links Keycloak groups to Airflow permissions via the Keycloak Admin REST API
+configure_airflow_authorization_policies() {
+  echo ""
+  echo "========================================="
+  echo "Configuring Keycloak Authorization Policies"
+  echo "========================================="
+  echo ""
+  
+  local KEYCLOAK_URL="http://localhost:8080"
+  local REALM="vault"
+  
+  # Get fresh admin token
+  KEYCLOAK_USER=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d)
+  KEYCLOAK_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
+  
+  ACCESS_TOKEN=$(curl -s -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
+    -d "client_id=admin-cli" \
+    -d "username=${KEYCLOAK_USER}" \
+    -d "password=${KEYCLOAK_PASS}" \
+    -d "grant_type=password" | jq -r '.access_token')
+  
+  if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "null" ]; then
+    echo "WARNING: Failed to get Keycloak admin token for authorization setup"
+    return 1
+  fi
+  
+  # Get Airflow client UUID
+  CLIENT_UUID=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq -r '.[] | select(.clientId=="airflow") | .id')
+  
+  if [ -z "$CLIENT_UUID" ] || [ "$CLIENT_UUID" == "null" ]; then
+    echo "WARNING: Could not find Airflow client in Keycloak"
+    return 1
+  fi
+  echo "  Airflow client UUID: ${CLIENT_UUID}"
+  
+  # Set resource server decision strategy to AFFIRMATIVE
+  # This is CRITICAL: with AFFIRMATIVE, only ONE permission needs to grant access
+  # With UNANIMOUS (default), ALL permissions must grant access, causing 403 errors
+  echo "  Setting resource server decision strategy to AFFIRMATIVE..."
+  curl -s -X PUT "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"id\": \"${CLIENT_UUID}\",
+      \"clientId\": \"${CLIENT_UUID}\",
+      \"name\": \"airflow\",
+      \"allowRemoteResourceManagement\": true,
+      \"policyEnforcementMode\": \"ENFORCING\",
+      \"decisionStrategy\": \"AFFIRMATIVE\"
+    }" > /dev/null
+  echo "    ✓ Resource server decision strategy: AFFIRMATIVE"
+  
+  # Get group IDs
+  echo "  Fetching group IDs..."
+  AIRFLOW_ADMIN_GROUP_ID=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/groups" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq -r '.[] | select(.name=="airflow-admin") | .id')
+  DATA_ENGINEERS_GROUP_ID=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/groups" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq -r '.[] | select(.name=="data-engineers") | .id')
+  DATA_SCIENTISTS_GROUP_ID=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/groups" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" | jq -r '.[] | select(.name=="data-scientists") | .id')
+  
+  echo "    airflow-admin: ${AIRFLOW_ADMIN_GROUP_ID}"
+  echo "    data-engineers: ${DATA_ENGINEERS_GROUP_ID}"
+  echo "    data-scientists: ${DATA_SCIENTISTS_GROUP_ID}"
+  
+  # Get all scope IDs
+  echo "  Fetching scope IDs..."
+  SCOPES_JSON=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/scope" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+  
+  GET_SCOPE=$(echo "$SCOPES_JSON" | jq -r '.[] | select(.name=="GET") | .id')
+  POST_SCOPE=$(echo "$SCOPES_JSON" | jq -r '.[] | select(.name=="POST") | .id')
+  PUT_SCOPE=$(echo "$SCOPES_JSON" | jq -r '.[] | select(.name=="PUT") | .id')
+  DELETE_SCOPE=$(echo "$SCOPES_JSON" | jq -r '.[] | select(.name=="DELETE") | .id')
+  MENU_SCOPE=$(echo "$SCOPES_JSON" | jq -r '.[] | select(.name=="MENU") | .id')
+  LIST_SCOPE=$(echo "$SCOPES_JSON" | jq -r '.[] | select(.name=="LIST") | .id')
+  
+  ALL_SCOPES="[\"${GET_SCOPE}\",\"${POST_SCOPE}\",\"${PUT_SCOPE}\",\"${DELETE_SCOPE}\",\"${MENU_SCOPE}\",\"${LIST_SCOPE}\"]"
+  READ_SCOPES="[\"${GET_SCOPE}\",\"${LIST_SCOPE}\",\"${MENU_SCOPE}\"]"
+  
+  # Get all resource IDs (for Admin permission to have full access)
+  echo "  Fetching resource IDs..."
+  RESOURCES_JSON=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/resource" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+  ALL_RESOURCE_IDS=$(echo "$RESOURCES_JSON" | jq -r '[.[]._id] | map("\"" + . + "\"") | join(",")')
+  ALL_RESOURCES="[${ALL_RESOURCE_IDS}]"
+  RESOURCE_COUNT=$(echo "$RESOURCES_JSON" | jq 'length')
+  echo "    Found ${RESOURCE_COUNT} resources"
+  
+  # Create group policies
+  echo "  Creating group policies..."
+  
+  # 1. airflow-admin-group-policy (Admin access)
+  ADMIN_POLICY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/policy/group" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"airflow-admin-group-policy\",
+      \"description\": \"Policy granting admin access to airflow-admin group\",
+      \"groups\": [{\"id\": \"${AIRFLOW_ADMIN_GROUP_ID}\", \"extendChildren\": false}],
+      \"logic\": \"POSITIVE\",
+      \"groupsClaim\": \"groups\"
+    }")
+  ADMIN_POLICY_CODE=$(echo "$ADMIN_POLICY_RESPONSE" | tail -n1)
+  if [ "$ADMIN_POLICY_CODE" == "201" ] || [ "$ADMIN_POLICY_CODE" == "409" ]; then
+    echo "    ✓ airflow-admin-group-policy"
+  fi
+  
+  # 2. data-engineers-group-policy (User/Editor access)
+  ENGINEERS_POLICY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/policy/group" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"data-engineers-group-policy\",
+      \"description\": \"Policy granting editor access to data-engineers group\",
+      \"groups\": [{\"id\": \"${DATA_ENGINEERS_GROUP_ID}\", \"extendChildren\": false}],
+      \"logic\": \"POSITIVE\",
+      \"groupsClaim\": \"groups\"
+    }")
+  ENGINEERS_POLICY_CODE=$(echo "$ENGINEERS_POLICY_RESPONSE" | tail -n1)
+  if [ "$ENGINEERS_POLICY_CODE" == "201" ] || [ "$ENGINEERS_POLICY_CODE" == "409" ]; then
+    echo "    ✓ data-engineers-group-policy"
+  fi
+  
+  # 3. data-scientists-group-policy (ReadOnly/Viewer access)
+  SCIENTISTS_POLICY_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/policy/group" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"data-scientists-group-policy\",
+      \"description\": \"Policy granting read-only access to data-scientists group\",
+      \"groups\": [{\"id\": \"${DATA_SCIENTISTS_GROUP_ID}\", \"extendChildren\": false}],
+      \"logic\": \"POSITIVE\",
+      \"groupsClaim\": \"groups\"
+    }")
+  SCIENTISTS_POLICY_CODE=$(echo "$SCIENTISTS_POLICY_RESPONSE" | tail -n1)
+  if [ "$SCIENTISTS_POLICY_CODE" == "201" ] || [ "$SCIENTISTS_POLICY_CODE" == "409" ]; then
+    echo "    ✓ data-scientists-group-policy"
+  fi
+  
+  # Get policy IDs
+  echo "  Fetching policy IDs..."
+  POLICIES_JSON=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/policy?type=group" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+  
+  ADMIN_POLICY_ID=$(echo "$POLICIES_JSON" | jq -r '.[] | select(.name=="airflow-admin-group-policy") | .id')
+  ENGINEERS_POLICY_ID=$(echo "$POLICIES_JSON" | jq -r '.[] | select(.name=="data-engineers-group-policy") | .id')
+  SCIENTISTS_POLICY_ID=$(echo "$POLICIES_JSON" | jq -r '.[] | select(.name=="data-scientists-group-policy") | .id')
+  
+  # Get permission IDs
+  PERMISSIONS_JSON=$(curl -s "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/permission" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+  
+  ADMIN_PERM_ID=$(echo "$PERMISSIONS_JSON" | jq -r '.[] | select(.name=="Admin") | .id')
+  USER_PERM_ID=$(echo "$PERMISSIONS_JSON" | jq -r '.[] | select(.name=="User") | .id')
+  READONLY_PERM_ID=$(echo "$PERMISSIONS_JSON" | jq -r '.[] | select(.name=="ReadOnly") | .id')
+  
+  # Update permissions with group policies
+  echo "  Linking policies to permissions..."
+  
+  # Admin permission -> airflow-admin-group-policy (all scopes on all resources)
+  if [ -n "$ADMIN_PERM_ID" ] && [ "$ADMIN_PERM_ID" != "null" ]; then
+    curl -s -X PUT "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/permission/scope/${ADMIN_PERM_ID}" \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"id\": \"${ADMIN_PERM_ID}\",
+        \"name\": \"Admin\",
+        \"type\": \"scope\",
+        \"logic\": \"POSITIVE\",
+        \"decisionStrategy\": \"AFFIRMATIVE\",
+        \"resources\": ${ALL_RESOURCES},
+        \"scopes\": ${ALL_SCOPES},
+        \"policies\": [\"${ADMIN_POLICY_ID}\"]
+      }" > /dev/null
+    echo "    ✓ Admin permission -> airflow-admin-group-policy (all ${RESOURCE_COUNT} resources)"
+  fi
+  
+  # User permission -> data-engineers-group-policy (all scopes)
+  if [ -n "$USER_PERM_ID" ] && [ "$USER_PERM_ID" != "null" ]; then
+    curl -s -X PUT "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/permission/resource/${USER_PERM_ID}" \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"id\": \"${USER_PERM_ID}\",
+        \"name\": \"User\",
+        \"type\": \"resource\",
+        \"logic\": \"POSITIVE\",
+        \"decisionStrategy\": \"AFFIRMATIVE\",
+        \"policies\": [\"${ENGINEERS_POLICY_ID}\"]
+      }" > /dev/null
+    echo "    ✓ User permission -> data-engineers-group-policy"
+  fi
+  
+  # ReadOnly permission -> data-scientists-group-policy (read scopes only)
+  if [ -n "$READONLY_PERM_ID" ] && [ "$READONLY_PERM_ID" != "null" ]; then
+    curl -s -X PUT "${KEYCLOAK_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/authz/resource-server/permission/scope/${READONLY_PERM_ID}" \
+      -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"id\": \"${READONLY_PERM_ID}\",
+        \"name\": \"ReadOnly\",
+        \"type\": \"scope\",
+        \"logic\": \"POSITIVE\",
+        \"decisionStrategy\": \"AFFIRMATIVE\",
+        \"scopes\": ${READ_SCOPES},
+        \"policies\": [\"${SCIENTISTS_POLICY_ID}\"]
+      }" > /dev/null
+    echo "    ✓ ReadOnly permission -> data-scientists-group-policy"
+  fi
+  
+  echo ""
+  echo "✓ Keycloak authorization policies configured"
+  echo ""
+  echo "Group → Permission Mapping:"
+  echo "  ┌─────────────────────┬──────────────┬─────────────────────────────┐"
+  echo "  │ Keycloak Group      │ Permission   │ Scopes                      │"
+  echo "  ├─────────────────────┼──────────────┼─────────────────────────────┤"
+  echo "  │ airflow-admin       │ Admin        │ GET,POST,PUT,DELETE,MENU,LIST│"
+  echo "  │ data-engineers      │ User         │ GET,POST,PUT,DELETE,MENU,LIST│"
+  echo "  │ data-scientists     │ ReadOnly     │ GET,LIST,MENU               │"
+  echo "  └─────────────────────┴──────────────┴─────────────────────────────┘"
+  echo ""
+}
+
 # Function to start port-forward
 start_airflow_port_forward() {
   echo "Starting port-forward for Airflow..."

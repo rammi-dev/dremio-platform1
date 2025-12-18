@@ -113,31 +113,156 @@ sequenceDiagram
 
 The deployment script automatically:
 1. Creates the Airflow Keycloak client with authorization services enabled
-2. Deploys Airflow with hostAliases for Keycloak connectivity
-3. Creates MinIO bucket for remote logging
-4. **Initializes Keycloak authorization scopes, resources, and permissions**
+2. Creates Keycloak groups (`airflow-admin`, `data-engineers`, `data-scientists`)
+3. Deploys Airflow with hostAliases for Keycloak connectivity
+4. Creates MinIO bucket for remote logging
+5. Initializes Keycloak authorization scopes, resources, and permissions
+6. **Configures group policies linking Keycloak groups to Airflow permissions**
 
-### Manual Permissions Setup (if automatic setup fails)
+## Keycloak Authorization Setup
 
-If the automatic permissions setup fails, run manually:
+The Airflow Keycloak Auth Manager uses Keycloak's **Authorization Services** for fine-grained access control. This requires a multi-step configuration:
+
+### Authorization Architecture
+
+```mermaid
+graph LR
+    subgraph Keycloak["Keycloak Authorization Services"]
+        Groups[Groups<br/>airflow-admin<br/>data-engineers<br/>data-scientists]
+        Policies[Group Policies]
+        Scopes[Scopes<br/>GET, POST, PUT<br/>DELETE, MENU, LIST]
+        Resources[Resources<br/>Dag, Connection<br/>Variable, Pool...]
+        Permissions[Permissions<br/>Admin, User<br/>ReadOnly, Op]
+    end
+    
+    Groups --> Policies
+    Policies --> Permissions
+    Scopes --> Permissions
+    Resources --> Permissions
+```
+
+### Step 1: Scopes (Created by Airflow CLI)
+
+Scopes define the types of operations that can be performed:
+
+| Scope | Description |
+|-------|-------------|
+| `GET` | Read/view resources |
+| `POST` | Create new resources |
+| `PUT` | Update existing resources |
+| `DELETE` | Remove resources |
+| `MENU` | Access menu items |
+| `LIST` | List/enumerate resources |
+
+### Step 2: Resources (Created by Airflow CLI)
+
+Resources represent Airflow entities that can be protected:
+
+- `Dag` - DAG definitions and runs
+- `Connection` - Database/API connections
+- `Variable` - Airflow variables
+- `Pool` - Worker pools
+- `Configuration` - Airflow config
+- `Asset` - Data assets
+- `Backfill` - Backfill operations
+- Menu items (Assets, Connections, Dags, etc.)
+
+### Step 3: Permissions (Created by Airflow CLI)
+
+Permissions combine resources and scopes:
+
+| Permission | Type | Description |
+|------------|------|-------------|
+| `Admin` | scope-based | Full access to all scopes |
+| `User` | resource-based | Standard user access |
+| `ReadOnly` | scope-based | Read-only access (GET, LIST, MENU) |
+| `Op` | resource-based | Operations access |
+
+### Step 4: Group Policies (Created by Deploy Script)
+
+Group policies link Keycloak groups to permissions. **This is the critical step** that the deployment script performs via the Keycloak Admin REST API:
+
+```
+┌─────────────────────┬────────────────────────────┬──────────────┬─────────────────────────────┐
+│ Keycloak Group      │ Group Policy               │ Permission   │ Scopes                      │
+├─────────────────────┼────────────────────────────┼──────────────┼─────────────────────────────┤
+│ airflow-admin       │ airflow-admin-group-policy │ Admin        │ GET,POST,PUT,DELETE,MENU,LIST│
+│ data-engineers      │ data-engineers-group-policy│ User         │ GET,POST,PUT,DELETE,MENU,LIST│
+│ data-scientists     │ data-scientists-group-policy│ ReadOnly    │ GET,LIST,MENU               │
+└─────────────────────┴────────────────────────────┴──────────────┴─────────────────────────────┘
+```
+
+### Step 5: Resource Server Decision Strategy (CRITICAL)
+
+The Keycloak Authorization Server uses a **decision strategy** to determine access when multiple permissions are evaluated:
+
+| Strategy | Behavior | Use Case |
+|----------|----------|----------|
+| `UNANIMOUS` | ALL permissions must PERMIT | High security, restrictive |
+| `AFFIRMATIVE` | ANY permission can PERMIT | Flexible, role-based |
+| `CONSENSUS` | Majority must PERMIT | Voting-based |
+
+**⚠️ IMPORTANT:** The default is `UNANIMOUS`, which causes 403 errors when:
+- User is in `airflow-admin` group → `Admin` permission = PERMIT
+- User is NOT in `data-scientists` group → `ReadOnly` permission = DENY
+- Result: **DENY** (because not all permissions permit)
+
+The deployment script sets this to `AFFIRMATIVE`, so users get access if **any** of their group's permissions grant it.
 
 ```bash
-# Get master realm admin credentials
+# Set resource server decision strategy (done by deployment script)
+curl -X PUT "http://localhost:8080/admin/realms/vault/clients/${CLIENT_UUID}/authz/resource-server" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decisionStrategy": "AFFIRMATIVE"
+  }'
+```
+
+### Manual Authorization Setup
+
+If automatic setup fails, configure manually:
+
+```bash
+# Step 1: Create scopes, resources, and permissions (via Airflow CLI)
 MASTER_USER=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.username}' | base64 -d)
 MASTER_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
 
-# Create authorization entities in Keycloak
 kubectl exec -it deploy/airflow-api-server -n airflow -- \
   airflow keycloak-auth-manager create-all \
     --username "$MASTER_USER" \
     --password "$MASTER_PASS" \
     --user-realm master
-```
 
-This creates:
-- **Scopes**: GET, POST, PUT, DELETE, MENU, LIST
-- **Resources**: Dag, Connection, Variable, Pool, Configuration, etc.
-- **Permissions**: ReadOnly, Admin, User, Op
+# Step 2: Configure group policies (via Keycloak Admin API)
+# Get admin token
+TOKEN=$(curl -s -X POST 'http://localhost:8080/realms/master/protocol/openid-connect/token' \
+  -d 'client_id=admin-cli' \
+  -d "username=$MASTER_USER" \
+  -d "password=$MASTER_PASS" \
+  -d 'grant_type=password' | jq -r '.access_token')
+
+# Get Airflow client UUID
+CLIENT_UUID=$(curl -s "http://localhost:8080/admin/realms/vault/clients" \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.[] | select(.clientId=="airflow") | .id')
+
+# Get airflow-admin group ID
+GROUP_ID=$(curl -s "http://localhost:8080/admin/realms/vault/groups" \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.[] | select(.name=="airflow-admin") | .id')
+
+# Create group policy
+curl -X POST "http://localhost:8080/admin/realms/vault/clients/${CLIENT_UUID}/authz/resource-server/policy/group" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"airflow-admin-group-policy\",
+    \"groups\": [{\"id\": \"${GROUP_ID}\", \"extendChildren\": false}],
+    \"logic\": \"POSITIVE\",
+    \"groupsClaim\": \"groups\"
+  }"
+
+# Repeat for data-engineers and data-scientists groups...
+```
 
 ## Configuration
 
