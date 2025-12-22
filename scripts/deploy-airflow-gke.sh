@@ -84,13 +84,33 @@ if ! kubectl get pod keycloak-0 -n operators 2>/dev/null | grep -q "Running"; th
 fi
 echo "✓ Keycloak is running"
 
-# Check if port-forward to Keycloak is active
-if ! curl -s http://localhost:8080/realms/master > /dev/null 2>&1; then
-  echo "WARNING: Keycloak port-forward not active. Starting it..."
-  kubectl port-forward svc/keycloak-service -n operators 8080:8080 > /dev/null 2>&1 &
-  sleep 3
+# Ensure port-forward to Keycloak is active
+echo "Ensuring Keycloak port-forward is active..."
+if ! curl -s --connect-timeout 2 http://localhost:8080/realms/master > /dev/null 2>&1; then
+  echo "Starting Keycloak port-forward..."
+  # Kill any existing port-forwards
+  pkill -f "kubectl.*port-forward.*keycloak.*8080" 2>/dev/null || true
+  sleep 1
+  
+  # Start new port-forward
+  kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0 > /dev/null 2>&1 &
+  
+  # Wait for it to be ready
+  for i in {1..10}; do
+    sleep 2
+    if curl -s --connect-timeout 2 http://localhost:8080/realms/master > /dev/null 2>&1; then
+      echo "✓ Keycloak accessible at localhost:8080"
+      break
+    fi
+    if [ $i -eq 10 ]; then
+      echo "ERROR: Failed to establish Keycloak port-forward"
+      exit 1
+    fi
+    echo "  Waiting for Keycloak port-forward... ($i/10)"
+  done
+else
+  echo "✓ Keycloak accessible at localhost:8080"
 fi
-echo "✓ Keycloak accessible at localhost:8080"
 
 # Ensure Keycloak hostname is set to 'keycloak' for proper logout redirects
 echo "  Configuring Keycloak hostname..."
