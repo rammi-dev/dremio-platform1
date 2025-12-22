@@ -12,15 +12,23 @@ authenticate_keycloak() {
   KEYCLOAK_PASS=$(kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d)
   
   # Get admin token
-  ACCESS_TOKEN=$(curl -s --connect-timeout 5 -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
+  TOKEN_RESPONSE=$(curl -s --connect-timeout 5 -X POST "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "client_id=admin-cli" \
     -d "username=${KEYCLOAK_USER}" \
     -d "password=${KEYCLOAK_PASS}" \
-    -d "grant_type=password" | jq -r '.access_token')
+    -d "grant_type=password")
+  
+  ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
   
   if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" == "null" ]; then
     echo "ERROR: Failed to authenticate with Keycloak"
+    echo "Response: $TOKEN_RESPONSE"
+    echo ""
+    echo "Troubleshooting:"
+    echo "  1. Check Keycloak is accessible: curl http://localhost:8080/realms/master"
+    echo "  2. Verify port-forward is running: kubectl port-forward -n operators svc/keycloak-service 8080:8080"
+    echo "  3. Check credentials: kubectl get secret keycloak-initial-admin -n operators"
     exit 1
   fi
   
@@ -35,6 +43,19 @@ configure_airflow_keycloak_client() {
   local REALM="vault"
   
   echo "Configuring Airflow client in Keycloak..."
+  
+  # Check if vault realm exists
+  REALM_RESPONSE=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/${REALM}" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}")
+  
+  if echo "$REALM_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+    echo "ERROR: Vault realm does not exist!"
+    echo "Response: $REALM_RESPONSE"
+    echo ""
+    echo "Please ensure deploy-gke.sh completed successfully and created the vault realm."
+    echo "The KeycloakRealmImport resource should have been applied."
+    exit 1
+  fi
   
   # Check if airflow client already exists
   EXISTING_CLIENT=$(curl -s -X GET "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
@@ -779,3 +800,4 @@ print_airflow_completion() {
   echo "Logout URL (use this to fully logout and switch users):"
   echo "  http://keycloak:8080/realms/vault/protocol/openid-connect/logout?client_id=airflow&post_logout_redirect_uri=http://localhost:8085/"
   echo ""
+}

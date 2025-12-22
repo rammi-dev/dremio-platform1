@@ -59,14 +59,10 @@ kubectl create secret docker-registry dremio-quay-secret \
 echo "✓ Namespace and secret ready"
 echo ""
 
-# Create license secret (if license key provided)
+# Note: License secret will be created by Helm chart
+# We'll pass the license key as a Helm value instead
 if [ -n "$DREMIO_LICENSE_KEY" ] && [ "$DREMIO_LICENSE_KEY" != "your-license-key-here" ]; then
-    echo "Creating Dremio license secret..."
-    kubectl create secret generic dremio-license \
-      --from-literal=license-key="$DREMIO_LICENSE_KEY" \
-      -n dremio \
-      --dry-run=client -o yaml | kubectl apply -f -
-    echo "✓ License secret created"
+    echo "✓ License key found in .env"
 else
     echo "⚠️  WARNING: No license key provided. Dremio will run in trial mode."
     echo "   Set DREMIO_LICENSE_KEY in .env file to use Enterprise features."
@@ -94,17 +90,27 @@ fi
 echo "✓ Retrieved MinIO credentials"
 echo ""
 
-# Deploy Dremio Enterprise via Helm
+# Deploy Dremio via Helm
 echo "Deploying Dremio Enterprise..."
-helm upgrade --install dremio ./helm/dremio \
+
+# Build Helm command with dynamic options
+HELM_CMD="helm upgrade --install dremio ./helm/dremio \
   -n dremio \
   --create-namespace \
   -f ./helm/dremio/values.yaml \
   -f ./helm/dremio/values-overwrite.yaml \
-  --set distStorage.aws.credentials.accessKey="$MINIO_ACCESS_KEY" \
-  --set distStorage.aws.credentials.secret="$MINIO_SECRET_KEY" \
-  --wait \
-  --timeout=15m
+  --set distStorage.aws.credentials.accessKey=\"$MINIO_ACCESS_KEY\" \
+  --set distStorage.aws.credentials.secret=\"$MINIO_SECRET_KEY\""
+
+# Add license key if provided
+if [ -n "$DREMIO_LICENSE_KEY" ] && [ "$DREMIO_LICENSE_KEY" != "your-license-key-here" ]; then
+  HELM_CMD="$HELM_CMD --set dremio.licenseKey=\"$DREMIO_LICENSE_KEY\""
+fi
+
+HELM_CMD="$HELM_CMD --wait --timeout=15m"
+
+# Execute Helm command
+eval $HELM_CMD
 
 echo "✓ Dremio Enterprise deployed"
 echo ""
