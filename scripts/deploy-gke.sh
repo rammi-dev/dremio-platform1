@@ -14,6 +14,41 @@ echo "Keycloak & Vault Deployment (GKE)"
 echo "========================================="
 echo ""
 
+# Step 0: Verify Prerequisites
+echo "Step 0: Verifying prerequisites..."
+
+# Check kubectl
+if ! command -v kubectl &> /dev/null; then
+  echo "ERROR: kubectl is not installed or not in PATH"
+  echo "       Please install kubectl: https://kubernetes.io/docs/tasks/tools/"
+  exit 1
+fi
+echo "✓ kubectl found"
+
+# Check helm
+if ! command -v helm &> /dev/null; then
+  echo ""
+  echo "ERROR: Helm is not installed or not in PATH"
+  echo "       Helm is required for deploying Vault, MinIO, and other components."
+  echo ""
+  echo "       To install Helm:"
+  echo "         - Using snap:  sudo snap install helm --classic"
+  echo "         - Using script: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+  echo "         - See: https://helm.sh/docs/intro/install/"
+  echo ""
+  exit 1
+fi
+echo "✓ helm found ($(helm version --short))"
+
+# Check jq
+if ! command -v jq &> /dev/null; then
+  echo "ERROR: jq is not installed or not in PATH"
+  echo "       Please install jq: sudo apt-get install jq"
+  exit 1
+fi
+echo "✓ jq found"
+echo ""
+
 # Step 1: Verify GKE Cluster
 echo "Step 1: Verifying GKE cluster connection..."
 if ! kubectl cluster-info &> /dev/null; then
@@ -87,14 +122,31 @@ echo ""
 
 # Step 6: Deploy Vault
 echo "Step 6: Deploying Vault..."
-helm repo add hashicorp https://helm.releases.hashicorp.com > /dev/null 2>&1 || true
-helm repo update > /dev/null 2>&1
+echo "Adding HashiCorp Helm repository..."
+if ! helm repo add hashicorp https://helm.releases.hashicorp.com 2>&1; then
+  echo "ERROR: Failed to add HashiCorp Helm repository"
+  exit 1
+fi
+
+echo "Updating Helm repositories..."
+if ! helm repo update 2>&1; then
+  echo "ERROR: Failed to update Helm repositories"
+  exit 1
+fi
+
 if helm status vault -n vault > /dev/null 2>&1; then
   echo "ERROR: Vault release already exists! This script expects a clean environment."
   echo "       To delete: helm uninstall vault -n vault"
   exit 1
 else
-  helm install vault hashicorp/vault -n vault -f helm/vault/values.yaml
+  echo "Installing Vault Helm chart..."
+  if ! helm install vault hashicorp/vault -n vault -f helm/vault/values.yaml 2>&1; then
+    echo ""
+    echo "ERROR: Failed to install Vault Helm chart"
+    echo "       Check the error message above for details"
+    exit 1
+  fi
+  echo "✓ Vault Helm chart installed"
 fi
 
 echo "Waiting for Vault pod to start..."

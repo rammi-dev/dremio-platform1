@@ -84,12 +84,28 @@ configure_keycloak_client() {
   local access_token=$1
   echo "Configuring Keycloak 'minio' client..."
   
-  # Check if client exists
-  CLIENT_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
-    -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+  # Check if vault realm exists
+  REALM_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault" \
+    -H "Authorization: Bearer $access_token")
   
-  if [ "$CLIENT_ID" == "null" ]; then
+  if echo "$REALM_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+    echo "ERROR: Vault realm does not exist!"
+    echo "Response: $REALM_RESPONSE"
+    echo ""
+    echo "Please ensure deploy-gke.sh completed successfully and created the vault realm."
+    echo "The KeycloakRealmImport resource should have been applied."
+    exit 1
+  fi
+  
+  # Check if client exists
+  CLIENTS_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
+    -H "Authorization: Bearer $access_token")
+  
+  CLIENT_COUNT=$(echo "$CLIENTS_RESPONSE" | jq 'length')
+  
+  if [ "$CLIENT_COUNT" -eq 0 ]; then
     # Create client
+    echo "Creating new 'minio' client..."
     curl -s -X POST "http://localhost:8080/admin/realms/vault/clients" \
       -H "Authorization: Bearer $access_token" \
       -H "Content-Type: application/json" \
@@ -98,8 +114,7 @@ configure_keycloak_client() {
   else
     echo "✓ 'minio' client already exists - Updating Redirect URIs..."
     # Update existing client (in case port changed)
-    CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
-      -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+    CLIENT_UUID=$(echo "$CLIENTS_RESPONSE" | jq -r '.[0].id')
       
     curl -s -X PUT "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID" \
       -H "Authorization: Bearer $access_token" \
@@ -108,17 +123,25 @@ configure_keycloak_client() {
     echo "✓ Updated 'minio' client configuration"
   fi
   
-  # Get Client UUID
-  # Export so it's available to calling scripts
+  # Get Client UUID (fetch again to ensure we have it)
   export CLIENT_UUID
   CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
     -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
   
+  if [ -z "$CLIENT_UUID" ] || [ "$CLIENT_UUID" == "null" ]; then
+    echo "ERROR: Failed to retrieve CLIENT_UUID"
+    exit 1
+  fi
+  
   # Get Client Secret
-  # Export so it's available to calling scripts
   export CLIENT_SECRET
   CLIENT_SECRET=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/client-secret" \
     -H "Authorization: Bearer $access_token" | jq -r '.value')
+  
+  if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" == "null" ]; then
+    echo "ERROR: Failed to retrieve CLIENT_SECRET"
+    exit 1
+  fi
   
   echo "✓ Retrieved MinIO Client Secret"
 }
@@ -128,18 +151,35 @@ configure_keycloak_rbac() {
   local access_token=$1
   echo "Configuring Keycloak RBAC..."
   
-  # Create 'minio-access' group in Keycloak
+  # Create 'minio-access' group in Keycloak (ignore if already exists)
   curl -s -X POST "http://localhost:8080/admin/realms/vault/groups" \
     -H "Authorization: Bearer $access_token" \
     -H "Content-Type: application/json" \
-    -d '{"name": "minio-access"}' > /dev/null
+    -d '{"name": "minio-access"}' > /dev/null 2>&1 || true
   
-  GROUP_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/groups?search=minio-access" \
-    -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+  # Get group ID
+  GROUPS_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/groups?search=minio-access" \
+    -H "Authorization: Bearer $access_token")
+  
+  GROUP_ID=$(echo "$GROUPS_RESPONSE" | jq -r '.[0].id')
+  
+  if [ -z "$GROUP_ID" ] || [ "$GROUP_ID" == "null" ]; then
+    echo "ERROR: Failed to retrieve minio-access group ID"
+    echo "Response: $GROUPS_RESPONSE"
+    exit 1
+  fi
   
   # Get Admin User ID (username: admin)
-  USER_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/users?username=admin" \
-    -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+  USERS_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/users?username=admin" \
+    -H "Authorization: Bearer $access_token")
+  
+  USER_ID=$(echo "$USERS_RESPONSE" | jq -r '.[0].id')
+  
+  if [ -z "$USER_ID" ] || [ "$USER_ID" == "null" ]; then
+    echo "ERROR: Failed to retrieve admin user ID"
+    echo "Response: $USERS_RESPONSE"
+    exit 1
+  fi
   
   # Add Admin to Group
   curl -s -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/groups/$GROUP_ID" \
