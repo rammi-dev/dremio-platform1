@@ -1,0 +1,21 @@
+spark-operator:
+  webhook:
+    enable: true
+  spark:
+    jobNamespaces:
+      - jupyterhub-users
+  # Resource limits for the operator itself if needed
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Configuration for the user namespace RBAC
+userNamespace:
+  name: jupyterhub-users
+  serviceAccount:
+    name: spark-driver
+    create: true

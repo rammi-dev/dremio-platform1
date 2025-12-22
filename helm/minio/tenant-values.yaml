@@ -19,7 +19,9 @@ tenant:
   
   buckets:
     - name: default-bucket
-      region: us-east-1
+    - name: user-data
+    - name: dremio  # For Dremio distributed storage (metadata, reflections, backups)
+    - name: dremio-catalog  # For Dremio Open Catalog (Polaris) - Iceberg tables
 
   
   configSecret:
@@ -55,3 +57,9 @@ tenant:
       requests:
         cpu: 50m
         memory: 64Mi
+
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+

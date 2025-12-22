@@ -16,32 +16,41 @@ check_keycloak_status() {
 ensure_keycloak_port_forward() {
   echo "Checking Keycloak port-forward..."
   
-  # Check if port-forward is already running
-  if ps aux | grep -q "[k]ubectl port-forward -n operators svc/keycloak-service 8080"; then
-    echo "✓ Keycloak port-forward already running"
-    return 0
-  fi
-  
-  # Check if port 8080 is accessible
-  if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null | grep -q "200\|302\|401"; then
+  # Check if port 8080 is accessible (most reliable check)
+  if curl -s --connect-timeout 2 http://localhost:8080/realms/master > /dev/null 2>&1; then
     echo "✓ Keycloak accessible on localhost:8080"
     return 0
   fi
   
+  # Check if port-forward process is running (any argument order)
+  if ps aux | grep -E "[k]ubectl.*port-forward.*keycloak.*8080" > /dev/null 2>&1; then
+    echo "Port-forward process found, waiting for it to be ready..."
+    sleep 3
+    if curl -s --connect-timeout 5 http://localhost:8080/realms/master > /dev/null 2>&1; then
+      echo "✓ Keycloak port-forward ready"
+      return 0
+    fi
+  fi
+  
   # Start port-forward
   echo "Starting Keycloak port-forward..."
-  pkill -f "kubectl port-forward -n operators svc/keycloak-service" 2>/dev/null || true
+  pkill -f "kubectl.*port-forward.*keycloak" 2>/dev/null || true
+  sleep 1
   nohup kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0 > /dev/null 2>&1 &
-  sleep 3
   
-  # Verify it's working
-  if curl -s -o /dev/null -w "%{http_code}" http://localhost:8080 2>/dev/null | grep -q "200\|302\|401"; then
-    echo "✓ Keycloak port-forward started successfully"
-  else
-    echo "ERROR: Failed to start Keycloak port-forward"
-    echo "Please run: kubectl port-forward -n operators svc/keycloak-service 8080:8080 --address=0.0.0.0"
-    exit 1
-  fi
+  # Wait for it to be ready with retries
+  for i in {1..10}; do
+    sleep 2
+    if curl -s --connect-timeout 2 http://localhost:8080/realms/master > /dev/null 2>&1; then
+      echo "✓ Keycloak port-forward started successfully"
+      return 0
+    fi
+    echo "  Waiting for Keycloak... ($i/10)"
+  done
+  
+  echo "ERROR: Failed to start Keycloak port-forward"
+  echo "Please run: kubectl port-forward -n operators svc/keycloak-service 8080:8080"
+  exit 1
 }
 
 # Authenticate with Keycloak and get access token
@@ -75,12 +84,28 @@ configure_keycloak_client() {
   local access_token=$1
   echo "Configuring Keycloak 'minio' client..."
   
-  # Check if client exists
-  CLIENT_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
-    -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+  # Check if vault realm exists
+  REALM_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault" \
+    -H "Authorization: Bearer $access_token")
   
-  if [ "$CLIENT_ID" == "null" ]; then
+  if echo "$REALM_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+    echo "ERROR: Vault realm does not exist!"
+    echo "Response: $REALM_RESPONSE"
+    echo ""
+    echo "Please ensure deploy-gke.sh completed successfully and created the vault realm."
+    echo "The KeycloakRealmImport resource should have been applied."
+    exit 1
+  fi
+  
+  # Check if client exists
+  CLIENTS_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
+    -H "Authorization: Bearer $access_token")
+  
+  CLIENT_COUNT=$(echo "$CLIENTS_RESPONSE" | jq 'length')
+  
+  if [ "$CLIENT_COUNT" -eq 0 ]; then
     # Create client
+    echo "Creating new 'minio' client..."
     curl -s -X POST "http://localhost:8080/admin/realms/vault/clients" \
       -H "Authorization: Bearer $access_token" \
       -H "Content-Type: application/json" \
@@ -89,8 +114,7 @@ configure_keycloak_client() {
   else
     echo "✓ 'minio' client already exists - Updating Redirect URIs..."
     # Update existing client (in case port changed)
-    CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
-      -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+    CLIENT_UUID=$(echo "$CLIENTS_RESPONSE" | jq -r '.[0].id')
       
     curl -s -X PUT "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID" \
       -H "Authorization: Bearer $access_token" \
@@ -99,17 +123,25 @@ configure_keycloak_client() {
     echo "✓ Updated 'minio' client configuration"
   fi
   
-  # Get Client UUID
-  # Export so it's available to calling scripts
+  # Get Client UUID (fetch again to ensure we have it)
   export CLIENT_UUID
   CLIENT_UUID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients?clientId=minio" \
     -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
   
+  if [ -z "$CLIENT_UUID" ] || [ "$CLIENT_UUID" == "null" ]; then
+    echo "ERROR: Failed to retrieve CLIENT_UUID"
+    exit 1
+  fi
+  
   # Get Client Secret
-  # Export so it's available to calling scripts
   export CLIENT_SECRET
   CLIENT_SECRET=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/clients/$CLIENT_UUID/client-secret" \
     -H "Authorization: Bearer $access_token" | jq -r '.value')
+  
+  if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" == "null" ]; then
+    echo "ERROR: Failed to retrieve CLIENT_SECRET"
+    exit 1
+  fi
   
   echo "✓ Retrieved MinIO Client Secret"
 }
@@ -119,18 +151,35 @@ configure_keycloak_rbac() {
   local access_token=$1
   echo "Configuring Keycloak RBAC..."
   
-  # Create 'minio-access' group in Keycloak
+  # Create 'minio-access' group in Keycloak (ignore if already exists)
   curl -s -X POST "http://localhost:8080/admin/realms/vault/groups" \
     -H "Authorization: Bearer $access_token" \
     -H "Content-Type: application/json" \
-    -d '{"name": "minio-access"}' > /dev/null
+    -d '{"name": "minio-access"}' > /dev/null 2>&1 || true
   
-  GROUP_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/groups?search=minio-access" \
-    -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+  # Get group ID
+  GROUPS_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/groups?search=minio-access" \
+    -H "Authorization: Bearer $access_token")
+  
+  GROUP_ID=$(echo "$GROUPS_RESPONSE" | jq -r '.[0].id')
+  
+  if [ -z "$GROUP_ID" ] || [ "$GROUP_ID" == "null" ]; then
+    echo "ERROR: Failed to retrieve minio-access group ID"
+    echo "Response: $GROUPS_RESPONSE"
+    exit 1
+  fi
   
   # Get Admin User ID (username: admin)
-  USER_ID=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/users?username=admin" \
-    -H "Authorization: Bearer $access_token" | jq -r '.[0].id')
+  USERS_RESPONSE=$(curl -s -X GET "http://localhost:8080/admin/realms/vault/users?username=admin" \
+    -H "Authorization: Bearer $access_token")
+  
+  USER_ID=$(echo "$USERS_RESPONSE" | jq -r '.[0].id')
+  
+  if [ -z "$USER_ID" ] || [ "$USER_ID" == "null" ]; then
+    echo "ERROR: Failed to retrieve admin user ID"
+    echo "Response: $USERS_RESPONSE"
+    exit 1
+  fi
   
   # Add Admin to Group
   curl -s -X PUT "http://localhost:8080/admin/realms/vault/users/$USER_ID/groups/$GROUP_ID" \
@@ -203,29 +252,18 @@ deploy_minio_tenant() {
   echo "Deploying MinIO Tenant..."
   kubectl create namespace minio --dry-run=client -o yaml | kubectl apply -f -
   
-  # Create tenant TLS certificate if it doesn't exist (required for STS communication)
-  echo "Checking for tenant TLS certificate..."
-  if ! kubectl get secret minio-tls -n minio >/dev/null 2>&1; then
-    echo "Creating tenant TLS certificate..."
-    openssl req -x509 -newkey rsa:2048 -keyout /tmp/minio-key.pem -out /tmp/minio-cert.pem -days 365 -nodes \
-      -subj "/CN=minio.minio.svc.cluster.local" \
-      -addext "subjectAltName=DNS:minio.minio.svc.cluster.local,DNS:*.minio.minio.svc.cluster.local,DNS:*.minio-hl.minio.svc.cluster.local,DNS:minio-console.minio.svc.cluster.local" 2>/dev/null
-    
-    # MinIO expects public.crt and private.key (not tls.crt and tls.key)
-    kubectl create secret generic minio-tls -n minio \
-      --from-file=public.crt=/tmp/minio-cert.pem \
-      --from-file=private.key=/tmp/minio-key.pem
-    rm -f /tmp/minio-key.pem /tmp/minio-cert.pem
-    echo "✓ Tenant TLS certificate created"
-  else
-    echo "✓ Tenant TLS certificate already exists"
-  fi
+  # DISABLED: Tenant TLS certificate creation (causes health check issues with self-signed certs)
+  # For production, use proper certificates from cert-manager or external CA
   
-  # Pass OIDC secret and explicitly disable requestAutoCert via --set
+  # Clean up any existing TLS secret to ensure TLS is disabled
+  echo "Cleaning up old TLS secrets..."
+  kubectl delete secret minio-tls -n minio 2>/dev/null || true
+  
+  # Deploy without TLS to avoid self-signed certificate issues
+  # Force requestAutoCert=false via multiple methods to ensure it's respected
   helm upgrade --install minio minio-operator/tenant -n minio -f helm/minio/tenant-values.yaml \
     --set tenant.requestAutoCert=false \
-    --set tenant.externalCertSecret[0].name=minio-tls \
-    --set tenant.externalCertSecret[0].type=kubernetes.io/tls \
+    --set tenant.features.enableSFTP=false \
     --set tenant.configuration.envs[2].name=MINIO_IDENTITY_OPENID_CLIENT_ID \
     --set tenant.configuration.envs[2].value=minio \
     --set tenant.configuration.envs[3].name=MINIO_IDENTITY_OPENID_CLIENT_SECRET \
@@ -233,6 +271,83 @@ deploy_minio_tenant() {
     --wait
   
   echo "✓ MinIO Tenant deployed"
+}
+
+# Configure MinIO policies and buckets (RESTORED: Script-based)
+configure_minio_policies() {
+  echo "Configuring MinIO policies using 'kubectl run' (ephemeral pod)..."
+  
+  # Wait for MinIO to be fully ready
+  sleep 5
+  
+  # Get Credentials
+  extract_minio_credentials # Populates MINIO_ROOT_USER and MINIO_ROOT_PASSWORD
+
+  # We use a single ephemeral pod to run all mc commands to avoid multiple pod startups
+  # Policies: data-science (s3:*), admin (s3:* + admin:*), vault-admins, admins
+  
+  echo "Applying MinIO Policies..."
+  kubectl run minio-policy-setup-v2 --image=minio/mc:latest --restart=Never --rm -i --command -- /bin/bash -c "
+    set -e
+    echo 'Connecting to MinIO...'
+    # Retry loop for connection - using HTTP since TLS is disabled
+    for i in {1..30}; do
+      if mc alias set myminio https://minio.minio.svc.cluster.local:443 '$MINIO_ROOT_USER' '$MINIO_ROOT_PASSWORD' --insecure; then
+        echo 'Connected to MinIO'
+        break
+      fi
+      echo 'Waiting for MinIO... (\$i/30)'
+      sleep 2
+    done
+
+    # Data Science Policy
+    echo 'Creating data-science policy...'
+    cat <<EOF > /tmp/policy-ds.json
+{
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"s3:*\"],
+      \"Resource\": [\"arn:aws:s3:::*\"]
+    }
+  ]
+}
+EOF
+    mc admin policy create myminio data-science /tmp/policy-ds.json || true
+
+    # Admin Policy (Full Admin)
+    echo 'Creating admin policies...'
+    cat <<EOF > /tmp/policy-admin.json
+{
+  \"Version\": \"2012-10-17\",
+  \"Statement\": [
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"s3:*\"],
+      \"Resource\": [\"arn:aws:s3:::*\"]
+    },
+    {
+      \"Effect\": \"Allow\",
+      \"Action\": [\"admin:*\"],
+      \"Resource\": [\"arn:aws:s3:::*\"]
+    }
+  ]
+}
+EOF
+    mc admin policy create myminio admin /tmp/policy-admin.json || true
+    mc admin policy create myminio vault-admins /tmp/policy-admin.json || true
+    mc admin policy create myminio admins /tmp/policy-admin.json || true
+
+    echo '✓ Policies Configured'
+  "
+
+  # Check if the ephemeral pod succeeded (it wraps errors with || true for policies but set -e catches other failures)
+  if [ $? -eq 0 ]; then
+    echo "✓ MinIO Policies configured successfully via script"
+  else
+    echo "WARNING: MinIO Policy configuration script failed"
+  fi
 }
 
 # Configure OIDC for MinIO
@@ -322,54 +437,7 @@ extract_minio_credentials() {
   fi
 }
 
-# Configure MinIO policies and buckets
-configure_minio_policies() {
-  echo "Configuring MinIO policies and buckets..."
-  
-  # Wait for MinIO to be fully ready
-  echo "Waiting for MinIO to be ready..."
-  sleep 10
-  
-  # Set up mc alias
-  echo "Setting up MinIO client alias..."
-  kubectl exec -n minio minio-pool-0-0 -c minio -- mc alias set myminio https://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" --insecure 2>/dev/null || {
-    echo "WARNING: Failed to set up mc alias, retrying..."
-    sleep 5
-    kubectl exec -n minio minio-pool-0-0 -c minio -- mc alias set myminio https://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" --insecure
-  }
-  
-  # Create minio-access policy
-  echo "Creating minio-access policy..."
-  kubectl exec -n minio minio-pool-0-0 -c minio -- sh -c 'cat > /tmp/minio-access-policy.json << "EOFPOLICY"
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:*"
-      ],
-      "Resource": [
-        "arn:aws:s3:::*"
-      ]
-    }
-  ]
-}
-EOFPOLICY
-mc admin policy create myminio minio-access /tmp/minio-access-policy.json --insecure 2>/dev/null || echo "Policy minio-access may already exist"'
-  
-  # Verify default bucket exists
-  echo "Verifying default bucket..."
-  if kubectl exec -n minio minio-pool-0-0 -c minio -- mc ls myminio/default-bucket --insecure 2>/dev/null; then
-    echo "✓ Default bucket 'default-bucket' exists"
-  else
-    echo "Creating default bucket..."
-    kubectl exec -n minio minio-pool-0-0 -c minio -- mc mb myminio/default-bucket --insecure
-    echo "✓ Created default bucket 'default-bucket'"
-  fi
-  
-  echo "✓ MinIO policies and buckets configured"
-}
+# Function configure_minio_policies removed in favor of declarative Job
 
 # Store MinIO credentials in Vault
 store_credentials_in_vault() {
@@ -468,7 +536,7 @@ print_completion_message() {
   echo "========================================="
   echo "MinIO Ready!"
   echo "========================================="
-  echo "Console: http://localhost:9091"
+  echo "Console: https://localhost:9091"
   echo "Login: Click 'Login with OpenID' -> Login with 'admin' / 'admin'"
   echo ""
 }

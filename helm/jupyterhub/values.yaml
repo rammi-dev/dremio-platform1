@@ -1,0 +1,238 @@
+# JupyterHub Helm Values Configuration
+# Integrates with Keycloak for OIDC authentication and MinIO for S3 storage
+
+hub:
+  config:
+    JupyterHub:
+      authenticator_class: generic-oauth
+      # Set base URL to ensure cookies work correctly
+      base_url: /
+      # CRITICAL: Fully qualified URL for user pods in separate namespace to connect back to Hub
+      hub_connect_url: http://hub.jupyterhub.svc.cluster.local:8081
+    Authenticator:
+      # Allow any user who can authenticate via OAuth
+      allow_all: true
+    GenericOAuthenticator:
+      client_id: minio
+      # client_secret will be set via --set during deployment
+      oauth_callback_url: http://jupyterhub.local:8000/hub/oauth_callback
+      authorize_url: http://keycloak-service.operators.svc.cluster.local:8080/realms/vault/protocol/openid-connect/auth
+      token_url: http://keycloak-service.operators.svc.cluster.local:8080/realms/vault/protocol/openid-connect/token
+      userdata_url: http://keycloak-service.operators.svc.cluster.local:8080/realms/vault/protocol/openid-connect/userinfo
+      username_claim: preferred_username
+      login_service: "Keycloak"
+      scope:
+        - openid
+        - profile
+        - email
+      enable_auth_state: true
+      
+      # Configure logout to redirect to Keycloak logout endpoint
+      logout_redirect_url: "http://keycloak-service.operators.svc.cluster.local:8080/realms/vault/protocol/openid-connect/logout?post_logout_redirect_uri=http://jupyterhub.local:8000&client_id=minio"
+    
+    KubeSpawner:
+      # Deploy user notebooks in separate namespace
+      namespace: jupyterhub-users
+  
+  # Service account needs permissions in both namespaces
+  serviceAccount:
+    create: true
+    name: jupyterhub
+  
+  # Cookie configuration - ensure cookies work across OAuth redirect
+  cookieSecret: null  # Will be auto-generated
+  
+  # Additional configuration for OAuth state cookies
+  extraConfig:
+    oauth_config: |
+      # Disable OAuth state cookie (browser blocking issue)
+      # This is less secure but works around cookie restrictions
+      c.GenericOAuthenticator.manage_state = False
+    
+    
+    
+    pre_spawn_hook: |
+      import requests
+      import xml.etree.ElementTree as ET
+      from urllib3.exceptions import InsecureRequestWarning
+      requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+      
+      async def pre_spawn_hook(spawner):
+          """Generate MinIO STS credentials before spawning notebook"""
+          
+          # Get user's OIDC token from auth state
+          auth_state = await spawner.user.get_auth_state()
+          if not auth_state or 'id_token' not in auth_state:
+              spawner.log.warning("No auth state or id_token found")
+              return
+          
+          id_token = auth_state['id_token']
+          
+          # Call MinIO STS API
+          try:
+              sts_response = requests.post(
+                  'https://minio.minio.svc.cluster.local:443',
+                  data={
+                      'Action': 'AssumeRoleWithWebIdentity',
+                      'WebIdentityToken': id_token,
+                      'Version': '2011-06-15',
+                      'DurationSeconds': '43200'  # 12 hours (max: 604800 = 7 days)
+                  },
+                  verify=False,
+                  timeout=10
+              )
+              
+              if sts_response.status_code != 200:
+                  spawner.log.error(f"STS request failed: {sts_response.status_code} - {sts_response.text}")
+                  return
+              
+              # Parse XML response
+              root = ET.fromstring(sts_response.text)
+              ns = {'aws': 'https://sts.amazonaws.com/doc/2011-06-15/'}
+              
+              credentials = root.find('.//aws:Credentials', ns)
+              if credentials is None:
+                  spawner.log.error("No credentials found in STS response")
+                  return
+              
+              access_key = credentials.find('aws:AccessKeyId', ns).text
+              secret_key = credentials.find('aws:SecretAccessKey', ns).text
+              session_token = credentials.find('aws:SessionToken', ns).text
+              
+              # Inject as environment variables
+              spawner.environment.update({
+                  'AWS_ACCESS_KEY_ID': access_key,
+                  'AWS_SECRET_ACCESS_KEY': secret_key,
+                  'AWS_SESSION_TOKEN': session_token,
+                  'S3_ENDPOINT': 'https://minio.minio.svc.cluster.local:443',
+                  'AWS_S3_ENDPOINT': 'https://minio.minio.svc.cluster.local:443'
+              })
+              
+              spawner.log.info(f"MinIO STS credentials injected for user {spawner.user.name}")
+              
+          except Exception as e:
+              spawner.log.error(f"Failed to get STS credentials: {str(e)}")
+      
+      c.Spawner.pre_spawn_hook = pre_spawn_hook
+
+    # Dynamic Profile Configuration
+    profiles: |
+      async def profile_list(spawner):
+          # Get user groups from auth state
+          auth_state = await spawner.user.get_auth_state()
+          groups = []
+          if auth_state and 'oauth_user' in auth_state:
+              groups = auth_state.get('oauth_user', {}).get('groups', [])
+          
+          spawner.log.info(f"User {spawner.user.name} groups: {groups}")
+
+          # 1. Standard Profile (Available to everyone, including Data Science)
+          profile_list = [
+              {
+                  'display_name': 'Small Environment (1 CPU, 2G RAM)',
+                  'slug': 'small',
+                  'default': True,
+                  'kubespawner_override': {
+                      'cpu_limit': 1,
+                      'mem_limit': '2G',
+                      'environment': {'PROFILE_NAME': 'small'},
+                  }
+              }
+          ]
+          
+          # 2. Large Profile (Restricted to 'admin' group)
+          if 'admin' in groups or 'vault-admins' in groups or 'admins' in groups:
+              profile_list.append({
+                  'display_name': 'Large Environment (4 CPU, 8G RAM)',
+                  'slug': 'large',
+                  'kubespawner_override': {
+                      'cpu_limit': 4,
+                      'mem_limit': '8G',
+                      'environment': {'PROFILE_NAME': 'large'},
+                  }
+              })
+          
+          return profile_list
+
+      c.KubeSpawner.profile_list = profile_list
+
+    # Startup Hooks
+    lifecycle_hooks: |
+      c.KubeSpawner.lifecycle_hooks = {
+          "postStart": {
+              "exec": {
+                  "command": [
+                      "/bin/bash",
+                      "-c",
+                      """
+                      echo "Starting profile setup for: $PROFILE_NAME"
+                      
+                      if [ "$PROFILE_NAME" == "small" ]; then
+                          echo "Configuring Small Environment..."
+                          # Add specific setup for small profile here
+                          echo "Small profile activated" > /home/jovyan/profile_info.txt
+                          # Example: wget https://example.com/small-dataset.zip
+                      elif [ "$PROFILE_NAME" == "large" ]; then
+                          echo "Configuring Large Environment..."
+                          # Add specific setup for large profile here
+                          echo "Large profile activated" > /home/jovyan/profile_info.txt
+                          # Example: wget https://example.com/large-dataset.zip
+                      fi
+                      """
+                  ]
+              }
+          }
+      }
+      
+      # TODO: Future Improvement - Automatic Credential Renewal
+      # Current implementation: Credentials expire after 12 hours, requiring notebook restart
+      # Proposed improvement: Add a sidecar container that:
+      #   1. Monitors credential expiration (check every hour)
+      #   2. Calls MinIO STS API to refresh credentials before expiry
+      #   3. Updates environment variables in running notebook pod
+      #   4. Allows notebooks to run indefinitely without manual restart
+      # Implementation: Use Kubernetes downward API + init container pattern
+
+singleuser:
+  image:
+    name: jupyter/scipy-notebook
+    tag: latest
+  
+  cpu:
+    limit: 2
+    guarantee: 0.5
+  
+  memory:
+    limit: 2G
+    guarantee: 512M
+  
+  storage:
+    type: dynamic
+    capacity: 10Gi
+    dynamic:
+      storageClass: standard
+  
+  extraEnv:
+    JUPYTER_ENABLE_LAB: "yes"
+
+proxy:
+  service:
+    type: ClusterIP
+  
+  https:
+    enabled: false
+
+scheduling:
+  userScheduler:
+    enabled: false
+
+
+
+# Configure idle culler to stop servers after timeout
+cull:
+  enabled: true
+  timeout: 3600     # Stop server after 1 hour (3600 seconds) of inactivity
+  every: 300        # Check for idle servers every 5 minutes
+  users: false      # Do not delete user records, just stop servers
+  removeNamedServers: false
+  concurrency: 10   # Number of concurrent cull operations

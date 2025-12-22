@@ -1,0 +1,135 @@
+# Apache Airflow Helm Values Configuration
+# Standalone deployment with PostgreSQL + LocalExecutor
+# Integrated with Keycloak for authentication via Keycloak Auth Manager
+
+# Executor: LocalExecutor for standalone testing
+executor: "LocalExecutor"
+
+# Disable Celery workers (not needed for LocalExecutor)
+workers:
+  replicas: 0
+
+# Disable Flower (Celery monitoring)
+flower:
+  enabled: false
+
+# PostgreSQL database configuration
+postgresql:
+  enabled: true
+  image:
+    registry: docker.io
+    repository: postgres
+    tag: "16-alpine"
+  primary:
+    persistence:
+      size: 1Gi
+
+# Redis (disabled for LocalExecutor)
+redis:
+  enabled: false
+
+# Web server configuration
+webserver:
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  # Disable default admin user - using Keycloak for authentication
+  defaultUser:
+    enabled: false
+
+# DAGs configuration - use persistent volume
+dags:
+  persistence:
+    enabled: true
+    size: 1Gi
+    accessMode: ReadWriteOnce
+
+# Logs configuration - disabled (GKE standard-rwo doesn't support ReadWriteMany)
+# Uses emptyDir instead - logs are ephemeral but pods can all write
+logs:
+  persistence:
+    enabled: false
+
+# Triggerer and scheduler configuration with small persistence
+triggerer:
+  enabled: true
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 1Gi
+
+scheduler:
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  logGroomerSidecar:
+    enabled: true
+
+# Extra environment variables for Keycloak Auth Manager and MinIO remote logging
+# _PIP_ADDITIONAL_REQUIREMENTS installs packages at container startup
+extraEnv: |
+  - name: _PIP_ADDITIONAL_REQUIREMENTS
+    value: "apache-airflow-providers-keycloak>=0.4.0 apache-airflow-providers-amazon>=8.0.0"
+  - name: AIRFLOW__CORE__AUTH_MANAGER
+    value: "airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManager"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_ID
+    value: "airflow"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: airflow-keycloak-secret
+        key: client-secret
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__REALM
+    value: "vault"
+  - name: AIRFLOW__KEYCLOAK_AUTH_MANAGER__SERVER_URL
+    value: "http://keycloak:8080"
+  - name: AIRFLOW__WEBSERVER__BASE_URL
+    value: "http://localhost:8085"
+  # Session configuration - handle token expiry gracefully
+  - name: AIRFLOW__WEBSERVER__SESSION_LIFETIME_MINUTES
+    value: "30"
+  - name: AIRFLOW__API__AUTH_BACKENDS
+    value: "airflow.providers.keycloak.auth_manager.keycloak_auth_manager.KeycloakAuthManagerAuthenticationBackend"
+  # Remote logging to MinIO
+  - name: AIRFLOW__LOGGING__REMOTE_LOGGING
+    value: "True"
+  - name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER
+    value: "s3://airflow-logs"
+  - name: AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID
+    value: "minio_logs"
+  - name: AIRFLOW__LOGGING__ENCRYPT_S3_LOGS
+    value: "False"
+  # MinIO connection for S3 logging (endpoint URL for MinIO)
+  - name: AIRFLOW_CONN_MINIO_LOGS
+    value: "aws://minio:minio123@?endpoint_url=https%3A%2F%2Fminio.minio.svc.cluster.local&verify=false"
+
+# Ingress (disabled - using port-forward for local access)
+ingress:
+  web:
+    enabled: false
+
+# Enable git-sync for DAGs (optional)
+gitSync:
+  enabled: false
+
+migrateDatabaseJob:
+  useHelmHooks: false
+
+# Security context
+securityContexts:
+  pod:
+    runAsUser: 50000
+    fsGroup: 0
+  container:
+    runAsUser: 50000

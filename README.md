@@ -1,211 +1,223 @@
-# Keycloak & Vault on Minikube
+# Data Platform on GKE
 
-Production-ready deployment of Keycloak and HashiCorp Vault on Minikube with OIDC integration and full data persistence.
+A data platform deployed on Google Kubernetes Engine (GKE) with centralized identity management, secrets management, object storage, distributed computing, and SQL analytics.
 
-## Features
+```mermaid
+graph LR
+    subgraph Platform
+        KC[🔐 Keycloak] --> Vault[🔑 Vault]
+        KC --> MinIO[📦 MinIO]
+        KC --> JH[📓 JupyterHub]
+        KC --> AF[🔄 Airflow]
+        KC --> Dremio[🔍 Dremio]
+        
+        JH -->|STS| MinIO
+        Spark[⚡ Spark] -->|S3A| MinIO
+        Spark -->|Arrow Flight| Dremio
+        AF -->|Orchestrate| Spark
+        AF -->|dbt| Dremio
+        Dremio -->|S3| MinIO
+    end
+```
 
-- ✅ **Full Data Persistence**: PostgreSQL (2Gi) and Vault (1Gi) with persistent storage
-- ✅ **OIDC Integration**: Vault authenticates via Keycloak
-- ✅ **Multi-Environment Support**: Minikube profiles for dev/staging/prod
-- ✅ **Automated Deployment**: One-command setup
-- ✅ **Production-Ready**: StatefulSets with persistent volumes
+## Components
+
+| Component | Purpose | Namespace |
+|-----------|---------|-----------|
+| **Keycloak** | Identity Provider (OIDC/OAuth) | `operators` |
+| **Vault** | Secrets Management | `vault` |
+| **MinIO** | S3-Compatible Object Storage | `minio` |
+| **JupyterHub** | Interactive Notebooks | `jupyterhub` |
+| **Spark Operator** | Distributed Computing | `operators` |
+| **Airflow** | Workflow Orchestration | `airflow` |
+| **Dremio** | SQL Analytics Engine | `dremio` |
+
+---
 
 ## Quick Start
 
-```bash
-# Deploy everything
-./scripts/deploy.sh
+### Prerequisites
 
-# Access services
-# Keycloak: http://localhost:8080
-# Vault: http://localhost:8200
+- GKE Cluster with `kubectl` configured
+- `helm` and `jq` installed
+
+### Connect to Cluster
+
+```bash
+gcloud container clusters get-credentials <cluster-name> --zone <zone> --project <project>
 ```
+
+### Deploy Platform
+
+```bash
+# 1. Core Infrastructure (Keycloak + Vault)
+./scripts/deploy-gke.sh
+
+# 2. Object Storage (MinIO)
+./scripts/deploy-minio-gke.sh
+
+# 3. Notebooks (JupyterHub)
+./scripts/deploy-jupyterhub-gke.sh
+
+# 4. Distributed Computing (Spark)
+./scripts/deploy-spark-operator.sh
+
+# 5. Workflow Orchestration (Airflow)
+./scripts/deploy-airflow-gke.sh
+
+# 6. SQL Analytics (Dremio) - Optional
+./scripts/deploy-dremio-ee.sh
+```
+
+### Access Services
+
+```bash
+./scripts/start-port-forwards.sh
+```
+
+| Service | URL | Login |
+|---------|-----|-------|
+| Keycloak | http://localhost:8080 | `admin` / `admin` |
+| Vault | http://localhost:8200 | OIDC or Token |
+| MinIO | https://localhost:9091 | "Login with OpenID" |
+| JupyterHub | http://localhost:8000 | "Sign in with Keycloak" |
+| Airflow | http://localhost:8085 | Keycloak OIDC |
+| Dremio | http://localhost:9047 | (when deployed) |
+
+---
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────┐
-│         Minikube (keycloak-vault)       │
-│                                         │
-│  ┌──────────────┐    ┌──────────────┐  │
-│  │  Keycloak    │◄───┤    Vault     │  │
-│  │  + PostgreSQL│OIDC│              │  │
-│  │  (2Gi PV)    │    │  (1Gi PV)    │  │
-│  └──────────────┘    └──────────────┘  │
-└─────────────────────────────────────────┘
-```
-
-## Prerequisites
-
-- Minikube
-- kubectl
-- Helm
-- jq
-- curl
-
-**Windows Users**: See [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for required hosts file configuration.
-
-## Usage
-
-### Initial Deployment
-
-```bash
-# Default profile (keycloak-vault)
-./scripts/deploy.sh
-
-# Custom profile
-MINIKUBE_PROFILE=my-env ./scripts/deploy.sh
+```mermaid
+graph TB
+    User[👤 User] -->|OIDC| KC[Keycloak]
+    
+    KC -->|Auth| Vault
+    KC -->|Auth| MinIO
+    KC -->|OAuth| JH[JupyterHub]
+    KC -->|Auth| AF[Airflow]
+    KC -->|Auth| Dremio
+    
+    JH -->|STS Credentials| MinIO
+    AF -->|Orchestrate| Spark
+    AF -->|dbt Jobs| Dremio
+    Spark -->|S3A| MinIO
+    Spark -->|Arrow Flight| Dremio
+    Dremio -->|S3| MinIO
+    
+    subgraph "Data Processing"
+        JH
+        AF
+        Spark[Spark Jobs]
+        Dremio
+    end
+    
+    subgraph "Data Lake"
+        MinIO
+    end
 ```
 
-### After Restart
+### Authentication Flow
 
-```bash
-# Restart everything (unseal Vault, start port-forwards)
-./scripts/restart.sh
-```
+1. **User** authenticates with **Keycloak** (OIDC)
+2. **Keycloak** issues ID Token with user groups
+3. **Services** validate tokens and apply group-based policies
+4. **MinIO STS** provides temporary S3 credentials
 
-### Multiple Environments
+### Data Flow
 
-```bash
-# Create different profiles
-minikube start -p dev --cpus 2 --memory 4096
-minikube start -p staging --cpus 4 --memory 8192
+- **JupyterHub**: Auto-injects MinIO STS credentials into notebooks
+- **Spark**: Uses S3A connector with MinIO credentials
+- **Dremio**: Queries data directly from MinIO buckets
 
-# Switch between them
-./scripts/switch-env.sh dev
-./scripts/switch-env.sh staging
-```
-
-## Access
-
-### Keycloak
-
-> **Important**: Keycloak has **two separate realms** with different credentials:
-
-**Master Realm** (Keycloak Admin Console):
-- **URL**: http://localhost:8080
-- **Username**: `temp-admin`
-- **Password**: *Dynamically generated* - retrieve with:
-  ```bash
-  kubectl get secret keycloak-initial-admin -n operators -o jsonpath='{.data.password}' | base64 -d
-  ```
-
-**Vault Realm** (Application Users):
-- **URL**: http://localhost:8080/realms/vault
-- **Username**: `admin`
-- **Password**: `admin`
-- **Purpose**: Login to Vault and MinIO via OIDC
-- **Note**: This user does NOT work for the master realm admin console
-
-### Vault
-- **URL**: http://localhost:8200
-- **Root Token**: See `config/vault-keys.json`
-- **OIDC Login**: Method=OIDC, Role=`admin`, then login with `admin`/`admin`
-
-## Documentation
-
-- **[GKE_DEPLOYMENT_GUIDE.md](docs/GKE_DEPLOYMENT_GUIDE.md)** - Complete GKE deployment and testing guide
-- **[QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick access to all credentials and commands
-- **[CREDENTIALS.md](docs/CREDENTIALS.md)** - All access credentials and URLs
-- **[setup_guide.md](docs/setup_guide.md)** - Detailed step-by-step setup
-- **[RESTART_GUIDE.md](docs/RESTART_GUIDE.md)** - Restart procedure
-- **[MULTI_CLUSTER.md](docs/MULTI_CLUSTER.md)** - Managing multiple environments
-- **[OIDC_LOGIN_GUIDE.md](docs/OIDC_LOGIN_GUIDE.md)** - OIDC login troubleshooting
-- **[WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** - Windows-specific configuration
-- **[walkthrough.md](docs/walkthrough.md)** - Complete deployment walkthrough
-
-
-## Scripts
-
-- **[deploy.sh](scripts/deploy.sh)** - Complete automated deployment (all-in-one)
-- **[restart.sh](scripts/restart.sh)** - Restart after `minikube stop`
-- **[switch-env.sh](scripts/switch-env.sh)** - Switch between profiles
-
-## Data Persistence
-
-All data persists across Minikube restarts:
-
-- **PostgreSQL**: 2Gi persistent volume (Keycloak realms, users, clients)
-- **Vault**: 1Gi persistent volume (secrets, OIDC config, policies)
-
-After `minikube stop` and `minikube start`, just run `./scripts/restart.sh` to unseal Vault and restart port-forwards. No reconfiguration needed!
+---
 
 ## Project Structure
 
 ```
-.
-├── helm/                   # Helm charts and Kubernetes manifests
-│   ├── vault/
-│   │   └── values.yaml     # Vault Helm values
-│   ├── keycloak/
-│   │   ├── values.yaml     # Keycloak Helm values
-│   │   └── manifests/      # Keycloak K8s manifests
-│   │       ├── keycloak-crd.yml
-│   │       ├── keycloak-realm-crd.yml
-│   │       ├── keycloak-operator.yml
-│   │       └── keycloak-instance.yaml
-│   └── postgres/
-│       ├── values.yaml                 # PostgreSQL configuration
-│       └── postgres-for-keycloak.yaml  # PostgreSQL for Keycloak
-├── scripts/                # Deployment and management scripts
-│   ├── deploy.sh           # Main deployment script
-│   ├── restart.sh          # Restart script
-│   └── switch-env.sh       # Profile switcher
-├── docs/                   # Documentation
-│   ├── CREDENTIALS.md      # Access credentials
-│   ├── setup_guide.md      # Detailed setup guide
-│   ├── RESTART_GUIDE.md    # Restart instructions
-│   └── *.md                # Other guides
-├── config/                 # Generated configuration (gitignored)
-│   ├── vault-keys.json     # Vault credentials
-│   └── keycloak-vault-client-secret.txt
-└── README.md               # This file
+├── docs/
+│   ├── ARCHITECTURE.md    # Detailed architecture diagrams
+│   ├── ACCESS.md          # Credentials and access control
+│   ├── DEPLOYMENT.md      # Step-by-step deployment guide
+│   ├── JUPYTERHUB.md      # JupyterHub OAuth configuration
+│   ├── MINIO_STS.md       # MinIO STS credentials guide
+│   └── VAULT_OIDC.md      # Vault OIDC login guide
+├── helm/
+│   ├── keycloak/          # Keycloak operator & manifests
+│   ├── vault/             # Vault Helm values
+│   ├── minio/             # MinIO operator & tenant config
+│   ├── jupyterhub/        # JupyterHub Helm values
+│   ├── spark/             # Spark operator chart
+│   └── dremio/            # Dremio Helm chart
+├── scripts/
+│   ├── deploy-gke.sh              # Deploy Keycloak + Vault
+│   ├── deploy-minio-gke.sh        # Deploy MinIO
+│   ├── deploy-jupyterhub-gke.sh   # Deploy JupyterHub
+│   ├── deploy-spark-operator.sh   # Deploy Spark Operator
+│   ├── deploy-dremio-ee.sh        # Deploy Dremio
+│   ├── start-port-forwards.sh     # Start all port forwards
+│   ├── show-access-info.sh        # Display credentials
+│   ├── list-users.sh              # List Keycloak users
+│   └── cleanup-dremio-namespace.sh # Clean stuck namespaces
+└── config/                # Generated credentials (gitignored)
 ```
 
-## Troubleshooting
+---
 
-### Vault OIDC Login Fails
-- Ensure role is set to `admin`
-- Windows: Check hosts file (see [WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md))
-- Verify port-forwards are running
+## Documentation
 
-### After Restart
-- Vault will be sealed - run `./scripts/restart.sh`
-- Port-forwards need to be restarted
-- All data persists automatically
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Component details, data flows, Mermaid diagrams |
+| [ACCESS.md](docs/ACCESS.md) | All credentials, auth methods, policies |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Complete GKE deployment guide |
+| [JUPYTERHUB.md](docs/JUPYTERHUB.md) | JupyterHub OAuth configuration |
+| [AIRFLOW.md](docs/AIRFLOW.md) | Airflow Keycloak Auth Manager setup |
+| [MINIO_STS.md](docs/MINIO_STS.md) | MinIO STS credential generation |
+| [VAULT_OIDC.md](docs/VAULT_OIDC.md) | Vault OIDC login troubleshooting |
 
-### Feature: MinIO Object Storage (Add-on)
-This project includes an optional MinIO integration with OIDC authentication (via Keycloak).
+---
 
-See **[helm/minio/README.md](helm/minio/README.md)** for deployment, access, and troubleshooting instructions.
+## Scripts Reference
 
-**Quick Command:**
+| Script | Purpose |
+|--------|---------|
+| `deploy-gke.sh` | Deploy Keycloak + Vault with OIDC |
+| `deploy-minio-gke.sh` | Deploy MinIO with OIDC + STS |
+| `deploy-jupyterhub-gke.sh` | Deploy JupyterHub with OAuth |
+| `deploy-spark-operator.sh` | Deploy Spark Operator |
+| `deploy-airflow-gke.sh` | Deploy Airflow with Keycloak Auth |
+| `deploy-dremio-ee.sh` | Deploy Dremio Enterprise |
+| `start-port-forwards.sh` | Start all port forwards |
+| `show-access-info.sh` | Display all credentials |
+| `list-users.sh` | List Keycloak users |
+| `list-policies.sh` | List MinIO policies |
+| `get-minio-sts-credentials.sh` | Get MinIO STS tokens |
+| `cleanup-dremio-namespace.sh` | Clean stuck namespaces |
+
+---
+
+## Quick Commands
+
 ```bash
-./scripts/deploy-minio.sh
+# Get all credentials
+./scripts/show-access-info.sh
+
+# Start port forwards
+./scripts/start-port-forwards.sh
+
+# List users
+./scripts/list-users.sh
+
+# Get MinIO STS credentials
+./scripts/get-minio-sts-credentials.sh
+
+# Check pods
+kubectl get pods -A | grep -E '^(operators|vault|minio|jupyterhub|dremio)'
 ```
-### Multiple Clusters
-- Use different profiles: `minikube start -p <name>`
-- Switch with: `./scripts/switch-env.sh <name>`
-- See [MULTI_CLUSTER.md](docs/MULTI_CLUSTER.md) for details
 
-## Clean Up
-
-```bash
-# Delete specific profile
-minikube delete -p keycloak-vault
-
-# Delete all
-minikube delete --all
-```
-
-## Important Files
-
-Generated during deployment (stored in `config/`):
-- `config/vault-keys.json` - Vault root token and unseal key
-- `config/keycloak-vault-client-secret.txt` - OIDC client secret
-
-(Note: These files are generated by `scripts/deploy.sh` and are ignored by `.gitignore` for security.)
+---
 
 ## License
 
-This is a reference implementation for development and testing purposes.
+Reference implementation for Data Platform deployment.

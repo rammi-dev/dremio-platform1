@@ -1,0 +1,214 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: vault-realm-import
+  namespace: operators
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: vault
+    enabled: true
+    displayName: Vault
+    
+    # Token lifespans (to avoid frequent 500 errors on token expiry)
+    accessTokenLifespan: 3600        # 1 hour (default: 5 minutes)
+    ssoSessionIdleTimeout: 7200      # 2 hours idle timeout
+    ssoSessionMaxLifespan: 86400     # 24 hours max session
+    
+    # Clients
+    clients:
+      - clientId: jupyterhub
+        name: JupyterHub
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: jupyterhub-secret  # Hardcoded for simplicity/reproducibility
+        protocol: openid-connect
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        redirectUris:
+          - "http://localhost:8000/hub/oauth_callback"
+          - "http://jupyterhub.local:8000/hub/oauth_callback"
+        protocolMappers:
+          - name: groups
+            protocol: openid-connect
+            protocolMapper: oidc-group-membership-mapper
+            consentRequired: false
+            config:
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              claim.name: "groups"
+          - name: email
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+            consentRequired: false
+            config:
+              user.attribute: email
+              claim.name: email
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+          - name: preferred_username
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+            consentRequired: false
+            config:
+              user.attribute: username
+              claim.name: preferred_username
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+      - clientId: minio
+        name: MinIO Console
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: minio-secret
+        protocol: openid-connect
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        publicClient: false
+        redirectUris:
+          - "https://localhost:9091/*"
+          - "http://localhost:9091/*"
+        webOrigins:
+          - "+"
+        protocolMappers:
+          - name: groups-mapper
+            protocol: openid-connect
+            protocolMapper: oidc-group-membership-mapper
+            config:
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              claim.name: "groups"
+
+      - clientId: vault
+        name: HashiCorp Vault
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: vault-secret
+        protocol: openid-connect
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        redirectUris:
+          - "http://localhost:8200/ui/vault/auth/oidc/oidc/callback"
+          - "http://127.0.0.1:8200/ui/vault/auth/oidc/oidc/callback"
+        protocolMappers:
+          - name: groups
+            protocol: openid-connect
+            protocolMapper: oidc-group-membership-mapper
+            config:
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              claim.name: "groups"
+
+      - clientId: airflow
+        name: Apache Airflow
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: airflow-secret
+        protocol: openid-connect
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        serviceAccountsEnabled: true
+        authorizationServicesEnabled: true
+        publicClient: false
+        redirectUris:
+          - "http://localhost:8085/*"
+          - "http://airflow.local:8085/*"
+        webOrigins:
+          - "+"
+        protocolMappers:
+          - name: groups-mapper
+            protocol: openid-connect
+            protocolMapper: oidc-group-membership-mapper
+            config:
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              claim.name: "groups"
+          - name: email
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+            config:
+              user.attribute: email
+              claim.name: email
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+          - name: preferred_username
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+            config:
+              user.attribute: username
+              claim.name: preferred_username
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+    # Groups
+    groups:
+      - name: admin
+        path: /admin
+      - name: data-science
+        path: /data-science
+      - name: vault-admins
+        path: /vault-admins
+      - name: airflow-admin
+        path: /airflow-admin
+      - name: data-engineers
+        path: /data-engineers
+      - name: data-scientists
+        path: /data-scientists
+
+    # Users
+    users:
+      - username: admin
+        enabled: true
+        email: admin@vault.local
+        firstName: Admin
+        lastName: User
+        emailVerified: true
+        credentials:
+          - type: password
+            value: admin
+            temporary: false
+        groups:
+          - admin
+          - vault-admins
+          - airflow-admin
+
+      - username: jupyter-admin
+        enabled: true
+        email: jupyter-admin@example.com
+        firstName: Jupyter
+        lastName: Admin
+        emailVerified: true
+        credentials:
+          - type: password
+            value: jupyter-admin
+            temporary: false
+        groups:
+          - admin
+          - vault-admins
+          - data-engineers
+
+      - username: jupyter-ds
+        enabled: true
+        email: ds@example.com
+        firstName: Data
+        lastName: Scientist
+        emailVerified: true
+        credentials:
+          - type: password
+            value: jupyter-ds
+            temporary: false
+        groups:
+          - data-science
+          - data-scientists

@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: 2.8.0-dremio-20251025004440-1f5a2bd
+description: The OpenSearch Operator Helm chart for Kubernetes
+name: dremio-opensearch-operator-helm
+type: application
+version: 2.8.0-dremio-20251025004440-1f5a2bd
