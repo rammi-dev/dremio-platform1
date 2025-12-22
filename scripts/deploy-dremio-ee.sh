@@ -104,7 +104,7 @@ HELM_CMD="helm upgrade --install dremio ./helm/dremio \
 
 # Add license key if provided
 if [ -n "$DREMIO_LICENSE_KEY" ] && [ "$DREMIO_LICENSE_KEY" != "your-license-key-here" ]; then
-  HELM_CMD="$HELM_CMD --set dremio.licenseKey=\"$DREMIO_LICENSE_KEY\""
+  HELM_CMD="$HELM_CMD --set dremio.license=\"$DREMIO_LICENSE_KEY\""
 fi
 
 HELM_CMD="$HELM_CMD --wait --timeout=15m"
@@ -113,6 +113,20 @@ HELM_CMD="$HELM_CMD --wait --timeout=15m"
 eval $HELM_CMD
 
 echo "✓ Dremio Enterprise deployed"
+echo ""
+
+# Start port forwarding for Dremio UI
+echo "Starting port-forward for Dremio UI..."
+kubectl port-forward -n dremio svc/dremio-client 9047:9047 --address=0.0.0.0 > /dev/null 2>&1 &
+PF_PID=$!
+sleep 2
+
+# Verify port-forward is running
+if kill -0 $PF_PID 2>/dev/null; then
+    echo "✓ Port-forward started (PID: $PF_PID)"
+else
+    echo "⚠️  Port-forward failed to start"
+fi
 echo ""
 
 # Display access information
@@ -124,14 +138,25 @@ echo "Components Deployed:"
 echo "  - MongoDB Operator (Percona)"
 echo "  - MongoDB Instance (single-node for POC)"
 echo "  - Dremio Coordinator"
+echo "  - Dremio Engine Operator"
 echo "  - Polaris Catalog (internal)"
 echo "  - OpenSearch"
 echo ""
 echo "Access Dremio Sonar UI:"
-echo "  1. Start port-forward:"
-echo "     kubectl port-forward -n dremio svc/dremio-client 9047:9047 --address=0.0.0.0"
+echo "  URL: http://localhost:9047"
 echo ""
-echo "  2. Access at: http://localhost:9047"
+echo "  ⚠️  IMPORTANT - First-time setup:"
+echo "  1. Create admin username and password"
+echo "  2. Go to Settings → Engines"
+echo "  3. Click 'Add Engine' to create your first engine"
+echo "  4. Choose size SMALL (minimal resources) for POC"
+echo ""
+echo "  📝 Engines CANNOT be created via Helm - they require"
+echo "     special annotations that are only set by the UI."
+echo ""
+echo "Manage port-forward:"
+echo "  Stop: kill $PF_PID"
+echo "  Restart: kubectl port-forward -n dremio svc/dremio-client 9047:9047 --address=0.0.0.0"
 echo ""
 echo "Check deployment status:"
 echo "  kubectl get pods -n dremio"

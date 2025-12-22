@@ -348,16 +348,14 @@ data:
                 - containerPort: 9010
                   name: metrics
               startupProbe:
-                httpGet:
-                  path: /live
-                  port: 9010
+                tcpSocket:
+                  port: {{ $.Values.engine.executor.probes.port | default 45678 }}
                 initialDelaySeconds: {{ $.Values.engine.executor.probes.startup.initialDelaySeconds }}
                 failureThreshold: {{ $.Values.engine.executor.probes.startup.failureThreshold }}
                 periodSeconds: {{ $.Values.engine.executor.probes.startup.periodSeconds }}
               livenessProbe:
-                httpGet:
-                  path: /live
-                  port: 9010
+                tcpSocket:
+                  port: {{ $.Values.engine.executor.probes.port | default 45678 }}
                 failureThreshold: {{ $.Values.engine.executor.probes.liveness.failureThreshold }}
                 periodSeconds: {{ $.Values.engine.executor.probes.liveness.periodSeconds }}
           initContainers:
